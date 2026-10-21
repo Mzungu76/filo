@@ -4,6 +4,8 @@ export type TaskStatus = "todo" | "done";
 export type Task = {
   id: string;
   title: string;
+  subject?: string;
+  dueDate?: number;
   status: TaskStatus;
   createdAt: number;
   completedAt?: number;

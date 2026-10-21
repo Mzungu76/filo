@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askNativeNotifications, hasSilentAccess, isNative, openSilentSettings, scheduleOne, cancelNative, setSilent, setStatusBar } from "@/lib/native";
+import { askNativeNotifications, hasSilentAccess, isNative, openSilentSettings, scheduleOne, cancelNative, setSilent, setStatusBar, setBars } from "@/lib/native";
 import { chime, keepAwake, unlockAudio, vibrate } from "@/lib/alerts";
 
 // filò (nero): nessuna distrazione. Si sceglie un tempo, si preme Avvia e lo schermo diventa nero.
@@ -65,6 +65,7 @@ export default function MonoApp() {
       if (saved !== null && Number.isFinite(Number(saved))) setSel(Number(saved));
     } catch {}
     void setStatusBar(true, "#000000");
+    void setBars(false);
     if (isNative()) {
       const check = () => void hasSilentAccess().then(setSilentOk);
       check();
@@ -86,6 +87,9 @@ export default function MonoApp() {
     void setSilent(false);
     if (!isNative()) { chime(phase === "work" ? "rest" : "start"); vibrate(); }
   }, [phase]);
+
+  // Barre di sistema: nere con icone nere mentre lo schermo è "spento", chiare altrimenti.
+  useEffect(() => { void setBars(screen === "running"); }, [screen]);
 
   // Orologio: controlla la scadenza anche al ritorno nell'app.
   useEffect(() => {

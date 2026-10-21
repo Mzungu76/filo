@@ -11,6 +11,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.provider.Settings;
+import android.view.Window;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -50,6 +53,27 @@ public class FocusPlugin extends Plugin {
         Intent intent = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
         call.resolve();
+    }
+
+    /** Barre di sistema nere. blackout = true: anche icone e testo diventano neri (invisibili sullo sfondo nero). */
+    @PluginMethod
+    public void setBars(final PluginCall call) {
+        final boolean blackout = Boolean.TRUE.equals(call.getBoolean("blackout", false));
+        getActivity().runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Window w = getActivity().getWindow();
+                    w.setStatusBarColor(0xFF000000);
+                    w.setNavigationBarColor(0xFF000000);
+                    if (Build.VERSION.SDK_INT >= 29) { w.setNavigationBarContrastEnforced(false); w.setStatusBarContrastEnforced(false); }
+                    WindowInsetsControllerCompat c = WindowCompat.getInsetsController(w, w.getDecorView());
+                    // "Light" = icone scure: con blackout le icone si confondono con il nero.
+                    c.setAppearanceLightStatusBars(blackout);
+                    c.setAppearanceLightNavigationBars(blackout);
+                } catch (Exception ignored) { }
+                call.resolve();
+            }
+        });
     }
 
     @PluginMethod

@@ -6,6 +6,7 @@ type FocusPlugin = {
   hasAccess(): Promise<{ granted: boolean }>;
   openAccessSettings(): Promise<void>;
   setSilent(o: { on: boolean }): Promise<void>;
+  setBars(o: { blackout: boolean }): Promise<void>;
   schedule(o: { events: NativeEvent[] }): Promise<void>;
   cancel(): Promise<void>;
   guardStatus(): Promise<{ available: boolean; serviceEnabled: boolean; on: boolean }>;
@@ -113,6 +114,12 @@ export async function snoozeGuard(minutes: number) {
 export async function consumeBlocked(): Promise<string | null> {
   if (!isNative()) return null;
   try { return (await Focus.consumeBlocked()).label ?? null; } catch { return null; }
+}
+
+/** Barre di stato e di navigazione nere; con blackout anche icone e testo neri (schermo "spento"). */
+export async function setBars(blackout: boolean) {
+  if (!isNative()) return;
+  try { await Focus.setBars({ blackout }); } catch {}
 }
 
 /** Colora la barra di stato di Android in base al tema. */

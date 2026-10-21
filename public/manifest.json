@@ -1,0 +1,13 @@
+{
+  "name": "Filo - Organizza il tuo studio",
+  "short_name": "Filo",
+  "description": "Un modo semplice per organizzare compiti, pause e ripartenze.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#172a3a",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

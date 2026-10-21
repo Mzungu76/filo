@@ -38,6 +38,12 @@ android {
             applicationIdSuffix ".lite"
             versionNameSuffix "-lite"
         }
+        // "focus": app separata e minimale (solo timer e compiti); il suo codice web arriva da src/focus/assets.
+        focus {
+            dimension "edition"
+            applicationIdSuffix ".focus"
+            versionNameSuffix "-focus"
+        }
     }
     buildTypes {
         release {

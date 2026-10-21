@@ -7,3 +7,4 @@ out/
 *.keystore
 *.jks
 keystore.base64.txt
+android/app/src/focus/assets/

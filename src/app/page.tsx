@@ -11,6 +11,7 @@ import { advance as stepTimer } from "@/lib/timer";
 import { computeStats } from "@/lib/stats";
 import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
+import FocusHome from "./FocusHome";
 import { BigRing, Ring, subjectHue, tap } from "./ui";
 import GoalsView from "./GoalsView";
 import { LevelBadge } from "./LevelBadge";
@@ -26,6 +27,8 @@ type Celebration = { kind: "medal" | "level" | "challenge" | "reward"; title: st
 
 // Programma suggerito: blocchi brevi con pausa, un compito alla volta. Le durate dipendono dal preset.
 const DEFAULT_START = "16:30";
+/** Edizione "focus": solo timer e compiti (NEXT_PUBLIC_EDITION=focus al momento della build). */
+const FOCUS = process.env.NEXT_PUBLIC_EDITION === "focus";
 const DAY = 24 * 3600 * 1000;
 
 function uid() {
@@ -83,6 +86,7 @@ export default function Home() {
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [writeOpen, setWriteOpen] = useState(false);
   const [confirmFree, setConfirmFree] = useState(false);
   const [skipFreeWarn, setSkipFreeWarn] = useState(false);
   const addRef = useRef<HTMLInputElement>(null);
@@ -250,7 +254,7 @@ export default function Home() {
 
   // Città: sfide della settimana, nuovi edifici, livelli e premio. Tutto derivato dai dati: niente da dichiarare a mano.
   useEffect(() => {
-    if (!ready || !goalsLoaded) return;
+    if (FOCUS || !ready || !goalsLoaded) return;
     // Raccoglie le feste di questo giro e ne mostra poche: medaglie migliori, livello, sfide unite, premio.
     const queue: Celebration[] = [];
     const lostNames: string[] = [];
@@ -601,6 +605,7 @@ export default function Home() {
     startWork();
   }
   function openAdd() {
+    if (FOCUS) { setWriteOpen(true); return; }
     setSheetOpen(true);
     setTimeout(() => addRef.current?.focus(), 380);
   }
@@ -799,6 +804,35 @@ export default function Home() {
   const nextTask = open.find((t) => t.id !== current?.id);
   const planLabel = hasTasks ? `${plan.work} min di studio · poi pausa ${plan.rest}` : "Studio libero · senza compito";
 
+  const confirmModal = (
+    confirmFree && (
+        <div className="modal-scrim" onClick={() => setConfirmFree(false)}>
+          <div className="advance-card" role="dialog" aria-label="Studi senza compiti" onClick={(e) => e.stopPropagation()}>
+            <strong>Stai studiando senza compiti!</strong>
+            <p>Non hai ancora niente in lista. Vuoi continuare lo stesso, oppure aggiungi prima un compito?</p>
+            <div className="advance-actions">
+              <button className="primary-btn dark" onClick={() => { setConfirmFree(false); startWork(); }}>Sì, continuo</button>
+              <button className="secondary-light" onClick={() => { setConfirmFree(false); openAdd(); }}>Aggiungo un compito</button>
+            </div>
+            <button className="link-btn" onClick={() => { try { localStorage.setItem("filo-skip-free-warning", "1"); } catch {} setSkipFreeWarn(true); setConfirmFree(false); startWork(); }}>Non avvisarmi più</button>
+          </div>
+        </div>
+      )
+  );
+  const advanceModal = (
+    advance && mode === "idle" && (
+        <div className="modal-scrim" onClick={() => setAdvance(null)}>
+          <div className="advance-card" role="dialog" aria-label="Vuoi avvantaggiarti?" onClick={(e) => e.stopPropagation()}>
+            <strong>Vuoi avvantaggiarti?</strong>
+            <p>Per oggi sei a posto. Il prossimo compito in scadenza è{advance.subject ? ` ${advance.subject}` : ""}: “{advance.title}” ({dueLabel(advance.dueDate, now).toLowerCase()}).</p>
+            <div className="advance-actions">
+              <button className="primary-btn dark" onClick={() => { setFocusId(advance.id); setAdvance(null); startWork(); }}>Sì, iniziamo</button>
+              <button className="secondary-light" onClick={() => setAdvance(null)}>No, per oggi basta</button>
+            </div>
+          </div>
+        </div>
+      )
+  );
   const topbar = (
       <header className="topbar">
         <span className="brand"><span className="brand-mark" aria-hidden="true">
@@ -818,8 +852,16 @@ export default function Home() {
   const ringLabel = mode === "idle" ? "Pronto" : timerLabel;
 
   return (
-    <main className={isHome ? "app-shell home-mode" : "app-shell"}>
-            {view === "goals" ? (
+    <main className={isHome ? (FOCUS ? "app-shell home-mode focus-mode" : "app-shell home-mode") : "app-shell"}>
+            {FOCUS ? (<>
+        <FocusHome writeOpen={writeOpen} setWriteOpen={setWriteOpen} mode={mode} shown={shown} ringValue={ringValue} timerLabel={timerLabel} planLabel={planLabel} preset={preset} choosePreset={choosePreset}
+          onPlay={onPlay} openSession={() => setFocusOpen(true)} open={open} current={current} setFocusId={setFocusId} toggleTask={toggleTask} deleteTask={deleteTask}
+          taskInput={taskInput} setTaskInput={setTaskInput} taskDate={taskDate} setTaskDate={setTaskDate} addTask={addTask}
+          native={native} reading={reading} importImage={importImage} importText={importText} setImportText={setImportText} preview={preview} skipped={skipped} setSkipped={setSkipped} toAdd={toAdd.length} importTasks={importTasks} pasteFromClipboard={pasteFromClipboard}
+          formatTime={formatTime} dueLabel={(d) => dueLabel(d, now)} dayKey={dayKey}/>
+        {confirmModal}
+        {advanceModal}
+      </>) : view === "goals" ? (
         <GoalsView top={topbar} houses={Math.floor(bonus / 20)} level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
           challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
           onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
@@ -917,32 +959,8 @@ export default function Home() {
         </div>
       </div>
 
-      {confirmFree && (
-        <div className="modal-scrim" onClick={() => setConfirmFree(false)}>
-          <div className="advance-card" role="dialog" aria-label="Studi senza compiti" onClick={(e) => e.stopPropagation()}>
-            <strong>Stai studiando senza compiti!</strong>
-            <p>Non hai ancora niente in lista. Vuoi continuare lo stesso, oppure aggiungi prima un compito?</p>
-            <div className="advance-actions">
-              <button className="primary-btn dark" onClick={() => { setConfirmFree(false); startWork(); }}>Sì, continuo</button>
-              <button className="secondary-light" onClick={() => { setConfirmFree(false); openAdd(); }}>Aggiungo un compito</button>
-            </div>
-            <button className="link-btn" onClick={() => { try { localStorage.setItem("filo-skip-free-warning", "1"); } catch {} setSkipFreeWarn(true); setConfirmFree(false); startWork(); }}>Non avvisarmi più</button>
-          </div>
-        </div>
-      )}
-
-      {advance && mode === "idle" && (
-        <div className="modal-scrim" onClick={() => setAdvance(null)}>
-          <div className="advance-card" role="dialog" aria-label="Vuoi avvantaggiarti?" onClick={(e) => e.stopPropagation()}>
-            <strong>Vuoi avvantaggiarti?</strong>
-            <p>Per oggi sei a posto. Il prossimo compito in scadenza è{advance.subject ? ` ${advance.subject}` : ""}: “{advance.title}” ({dueLabel(advance.dueDate, now).toLowerCase()}).</p>
-            <div className="advance-actions">
-              <button className="primary-btn dark" onClick={() => { setFocusId(advance.id); setAdvance(null); startWork(); }}>Sì, iniziamo</button>
-              <button className="secondary-light" onClick={() => setAdvance(null)}>No, per oggi basta</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {confirmModal}
+      {advanceModal}
       </>)}
 
       {mode !== "idle" && focusOpen && (
@@ -993,7 +1011,7 @@ export default function Home() {
         </div>
       )}
 
-      <nav className="bottom-nav" aria-label="Navigazione principale">
+      {!FOCUS && <nav className="bottom-nav" aria-label="Navigazione principale">
         <div className="bottom-nav-inner">
           <button className={view === "today" ? "nav-item active" : "nav-item"} onClick={() => setView("today")} aria-current={view === "today" ? "page" : undefined}><HomeIcon size={22}/>Oggi</button>
           <button className={view === "goals" ? "nav-item active" : "nav-item"} onClick={() => setView("goals")} aria-current={view === "goals" ? "page" : undefined}>
@@ -1002,7 +1020,7 @@ export default function Home() {
           <button className={view === "stats" ? "nav-item active" : "nav-item"} onClick={() => setView("stats")} aria-current={view === "stats" ? "page" : undefined}><BarChart3 size={22}/>Statistiche</button>
           <button className={showSettings ? "nav-item active" : "nav-item"} onClick={() => setShowSettings(true)}><Settings2 size={22}/>Impostazioni</button>
         </div>
-      </nav>
+      </nav>}
 
       {notice && (
         <div className="toast" role="status">

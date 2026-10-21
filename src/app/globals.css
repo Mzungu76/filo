@@ -187,3 +187,87 @@ h2{font-size:20px;line-height:1.2}
 .hbar{display:grid;grid-template-columns:minmax(80px,1.1fr) 2fr auto;align-items:center;gap:10px;font-size:12px}
 .hbar-label{color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hbar-value{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;min-width:44px;text-align:right}
+
+/* ---------- Medaglie ---------- */
+.medal{position:relative;display:inline-block;flex:0 0 auto;--hi:#eef1f4;--mid:#cfd6dc;--lo:#9aa5ae;--ink:#6c7882}
+.medal.t1{--hi:#f1c9a5;--mid:#c98a5b;--lo:#86502d;--ink:#fff6ee}
+.medal.t2{--hi:#fbfdff;--mid:#c4ced8;--lo:#8695a3;--ink:#33414d}
+.medal.t3{--hi:#fff0b0;--mid:#f0c14b;--lo:#b97f0f;--ink:#5a3a00}
+.medal-ribbon{position:absolute;left:0;right:0;bottom:-12%;height:40%;z-index:0}
+.medal-ribbon::before,.medal-ribbon::after{content:"";position:absolute;top:0;width:30%;height:100%;background:linear-gradient(#2f6f8f,#1c4a63);clip-path:polygon(0 0,100% 0,100% 100%,50% 80%,0 100%)}
+.medal-ribbon::before{left:22%;transform:rotate(14deg)}.medal-ribbon::after{right:22%;transform:rotate(-14deg);background:linear-gradient(#3d86a8,#245b78)}
+.medal.t0 .medal-ribbon{display:none}
+.medal-disc{position:absolute;inset:0;z-index:1;display:grid;place-items:center;border-radius:50%;color:var(--ink);overflow:hidden;
+  background:radial-gradient(circle at 30% 24%,var(--hi),var(--mid) 56%,var(--lo));
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.38),inset 0 -5px 10px rgba(0,0,0,.14),0 6px 14px rgba(23,42,58,.22)}
+.medal-disc::before{content:"";position:absolute;inset:13%;border-radius:50%;border:2px solid rgba(255,255,255,.5);box-shadow:inset 0 2px 4px rgba(0,0,0,.12)}
+.medal-disc svg{position:relative;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+.medal.t0 .medal-disc{background:#e8ecef;box-shadow:inset 0 0 0 2px #d3dadf;color:#a9b4bb}
+.medal.t0 .medal-disc::before{border:2px dashed #c2cbd1;box-shadow:none}
+.medal-shine{position:absolute;inset:0;border-radius:50%;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.75) 50%,transparent 62%);background-size:260% 100%;background-position:130% 0;animation:medal-shine 4.2s ease-in-out infinite}
+@keyframes medal-shine{0%,55%{background-position:130% 0}100%{background-position:-60% 0}}
+.medal.pop{animation:medal-pop .9s cubic-bezier(.2,1.2,.3,1) both}
+@keyframes medal-pop{0%{transform:scale(.15) rotate(-30deg);opacity:0}55%{transform:scale(1.2) rotate(7deg);opacity:1}78%{transform:scale(.94) rotate(-3deg)}100%{transform:scale(1) rotate(0)}}
+.spark{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;background:#ffd95a;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);opacity:0;animation:spark 1.1s ease-out var(--d) .35s both}
+@keyframes spark{0%{opacity:0;transform:rotate(var(--a)) translateY(0) scale(.3)}25%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateY(-92px) scale(1)}}
+.lvl-badge{display:inline-grid;place-items:center;flex:0 0 auto;border-radius:50%;font-family:Manrope,sans-serif;font-weight:800;color:#5a3a00;
+  background:radial-gradient(circle at 30% 24%,#fff0b0,#f0c14b 56%,#b97f0f);box-shadow:inset 0 0 0 2px rgba(255,255,255,.45),0 3px 8px rgba(185,127,15,.35)}
+
+/* ---------- Striscia punti/livello ---------- */
+.strip{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 12px;padding:11px 14px;border:1px solid var(--line);border-radius:16px;background:white;text-align:left;color:var(--ink)}
+.strip-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.strip-main strong{font-size:14px;font-family:Manrope,sans-serif}
+.strip-main small{font-size:11px;color:var(--muted)}
+.strip-bar{display:block;height:7px;border-radius:99px;background:#e6ebee;overflow:hidden}
+.strip-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7fd2ad,#4c9876);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.strip-today{display:flex;flex-direction:column;align-items:flex-end;font-family:Manrope,sans-serif;font-weight:800;font-size:16px;color:#2f7357}
+.strip-today small{font-family:'DM Sans',sans-serif;font-weight:500;font-size:10px;color:var(--muted)}
+.strip-today.bump{animation:bump .5s ease}
+@keyframes bump{40%{transform:scale(1.25)}}
+.reward-line{display:flex;align-items:center;gap:9px;margin:-4px 0 12px;padding:9px 12px;border-radius:12px;background:#eaf0f2;font-size:12px;color:var(--ink-soft)}
+.reward-line span{flex:1}
+.reward-line.ready{background:#fff4d6;color:#6b4a00}
+.reward-line .install-go{padding:7px 11px}
+
+/* ---------- Pagina Traguardi ---------- */
+.goals-page h1{margin-bottom:8px}
+.level-card,.rhythm-card{display:flex;align-items:center;gap:14px;margin-top:18px;padding:16px;border-radius:18px;background:white;border:1px solid var(--line)}
+.level-info{flex:1;display:flex;flex-direction:column;gap:5px}.level-info strong{font-family:Manrope,sans-serif;font-size:20px}.level-info span:not(.strip-bar){font-size:12px;color:var(--ink-soft)}
+.rhythm-card p{margin:3px 0 0;font-size:12px;line-height:1.5;color:var(--ink-soft)}
+.rhythm-ring{--p:0%;flex:0 0 auto;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#4c9876 var(--p),#e6ebee 0);position:relative}
+.rhythm-ring::before{content:"";position:absolute;inset:6px;border-radius:50%;background:white}.rhythm-ring strong{position:relative;font-family:Manrope,sans-serif;font-size:16px}
+.challenges{display:flex;flex-direction:column;gap:9px}
+.challenge{padding:12px 14px;border-radius:14px;background:white;border:1px solid var(--line)}
+.challenge.done{background:#f2f8f6;border-color:var(--mint-strong)}
+.challenge-top{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;font-size:13px}.challenge-top span{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.reward-card{display:flex;align-items:center;gap:12px;margin-top:12px;padding:13px 14px;border-radius:14px;background:#eaf0f2;color:var(--accent)}
+.reward-card div{flex:1;display:flex;flex-direction:column;gap:3px;color:var(--ink)}.reward-card strong{font-size:13px}.reward-card span{font-size:11px;color:var(--ink-soft);line-height:1.4}
+.reward-card .secondary-light{margin:0}.reward-card.ready{background:#fff4d6;color:#a06d00}
+.count{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted);font-weight:600;margin-left:6px}
+.medal-family{margin-top:14px}
+.medal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.medal-cell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px 10px;border:1px solid var(--line);border-radius:16px;background:white;color:var(--ink)}
+.medal-cell .medal{margin-bottom:12px}
+.medal-name{font-size:11px;font-weight:700;text-align:center;line-height:1.25;min-height:28px}
+.medal-prog{display:block;width:70%;height:5px;border-radius:99px;background:#e6ebee;overflow:hidden}.medal-prog i{display:block;height:100%;background:#4c9876;border-radius:99px}
+.medal-sub{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.medal-cell.locked .medal-name{color:var(--ink-soft)}
+.medal-sheet{position:relative;text-align:center}
+.medal-sheet .medal{margin:6px 0 22px}.medal-sheet h2{margin-top:2px}.medal-sheet .subhead{margin:4px 0 8px}
+.sheet-close{position:absolute;right:16px;top:16px}
+.medal-why{margin:0 0 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;font-style:italic}
+.tier-list{display:flex;flex-direction:column;gap:8px;text-align:left}
+.tier-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:white;border:1px solid var(--line);font-size:12px;line-height:1.4}
+.tier-row .medal{margin:0 4px 0 0}.tier-row span{flex:1}.tier-row.got{background:#f2f8f6;border-color:var(--mint-strong)}.tier-row b{color:#2f7357}
+
+/* ---------- Celebrazione ---------- */
+.celebrate{text-align:center;padding-top:30px}
+.celebrate .medal,.celebrate .lvl-badge{margin:18px auto 26px;display:block}
+.celebrate .lvl-badge{display:grid;animation:medal-pop .9s cubic-bezier(.2,1.2,.3,1) both}
+.celebrate h2{margin:4px 0 8px}.celebrate .subhead{margin-bottom:20px}
+@media (prefers-reduced-motion:reduce){.medal.pop,.celebrate .lvl-badge{animation:none}.spark,.medal-shine{display:none}.strip-today.bump{animation:none}.strip-bar i{transition:none}}
+.reward-edit{display:flex;flex-direction:column;gap:7px;margin:14px 0}
+.reward-edit strong{font-size:13px}.reward-edit>span{font-size:11px;color:var(--muted);line-height:1.45}
+.reward-edit input{border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px;background:white;color:var(--ink)}
+.reward-edit label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-soft)}
+.reward-edit select{border:1px solid var(--line);border-radius:9px;padding:7px 9px;font:inherit;font-size:12px;background:white;color:var(--ink)}

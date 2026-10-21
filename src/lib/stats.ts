@@ -24,7 +24,7 @@ export function startOfDay(ts: number) {
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
-function weekStart(ts: number) {
+export function weekStart(ts: number) {
   const d = new Date(startOfDay(ts));
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return d.getTime();

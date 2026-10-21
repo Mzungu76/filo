@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BarChart3, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Gift, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
@@ -11,10 +11,15 @@ import { advance as stepTimer } from "@/lib/timer";
 import { computeStats } from "@/lib/stats";
 import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
+import GoalsView from "./GoalsView";
+import Medal, { LevelBadge } from "./Medal";
+import { challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
+import { weekStart as weekStartOf } from "@/lib/stats";
 import { SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
+type Celebration = { kind: "medal" | "level" | "challenge" | "reward"; title: string; text: string; icon?: MedalIcon; tier?: Tier; level?: number };
 
 // Programma suggerito: blocchi brevi con pausa, un compito alla volta. Le durate dipendono dal preset.
 const DEFAULT_START = "16:30";
@@ -85,7 +90,19 @@ export default function Home() {
   const install = useInstall();
   const [native, setNative] = useState(false);
   const [silentOk, setSilentOk] = useState(false);
-  const [view, setView] = useState<"today" | "stats">("today");
+  const [view, setView] = useState<"today" | "stats" | "goals">("today");
+  const [bonus, setBonus] = useState(0);
+  const [plan2, setPlan2] = useState<ChallengePlan | null>(null);
+  const [reward, setReward] = useState<{ text: string; need: number }>({ text: "", need: 2 });
+  const [rewardClaimed, setRewardClaimed] = useState(0);
+  const [celebrateOn, setCelebrateOn] = useState(true);
+  const [celebrations, setCelebrations] = useState<Celebration[]>([]);
+  const [goalsLoaded, setGoalsLoaded] = useState(false);
+  const goalsRef = useRef<{ plan: ChallengePlan | null; bonus: number; seen: { medals: Record<string, number>; level: number } | null; reward: { text: string; need: number }; claimed: number; notified: number; celebrate: boolean }>(
+    { plan: null, bonus: 0, seen: null, reward: { text: "", need: 2 }, claimed: 0, notified: 0, celebrate: true });
+  const dataRef = useRef<{ sessions: StudySession[]; tasks: Task[] }>({ sessions: [], tasks: [] });
+  const syncing = useRef(false);
+  const resistedRef = useRef(0);
   const [quotesOn, setQuotesOn] = useState(true);
   const [quote, setQuote] = useState<string | null>(null);
   const [blockedQuote, setBlockedQuote] = useState("");
@@ -123,6 +140,15 @@ export default function Home() {
     void setGuard(gOn, gApps);
     setAlertsOn(savedAlerts);
     setStartTime(savedStart);
+    const g = goalsRef.current;
+    const [gPlan, gBonus, gSeen, gReward, gClaimed, gNotified, gCelebrate] = await Promise.all([
+      getSetting<ChallengePlan | null>("challenges", null), getSetting("bonus", 0),
+      getSetting<{ medals: Record<string, number>; level: number } | null>("seen", null),
+      getSetting("reward", { text: "", need: 2 }), getSetting("rewardClaimed", 0), getSetting("rewardNotified", 0), getSetting("celebrate", true)
+    ]);
+    Object.assign(g, { plan: gPlan, bonus: gBonus, seen: gSeen, reward: gReward, claimed: gClaimed, notified: gNotified, celebrate: gCelebrate });
+    setPlan2(gPlan); setBonus(gBonus); setReward(gReward); setRewardClaimed(gClaimed); setCelebrateOn(gCelebrate);
+    setGoalsLoaded(true);
     setTasks(nextTasks);
     setSessions(nextSessions);
     setReady(true);
@@ -171,6 +197,85 @@ export default function Home() {
     document.addEventListener("visibilitychange", check);
     return () => document.removeEventListener("visibilitychange", check);
   }, [native]);
+
+  // Traguardi: sfide della settimana, nuove medaglie, livelli e premio. Tutto derivato dai dati: niente da dichiarare a mano.
+  useEffect(() => {
+    if (!ready || !goalsLoaded) return;
+    // Raccoglie le feste di questo giro e ne mostra poche: medaglie migliori, livello, sfide unite, premio.
+    const queue: Celebration[] = [];
+    const celebrate = (c: Celebration) => { queue.push(c); };
+    const flush = () => {
+      const medalsNew = queue.filter((c) => c.kind === "medal").sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0));
+      const challengesNew = queue.filter((c) => c.kind === "challenge");
+      const merged: Celebration[] = challengesNew.length > 1
+        ? [{ kind: "challenge", title: "Sfide completate!", text: `${challengesNew.map((c) => c.text.split(" · ")[0]).join(" · ")} · +${20 * challengesNew.length} punti` }]
+        : challengesNew;
+      const show = [...medalsNew.slice(0, 3), ...queue.filter((c) => c.kind === "level"), ...merged, ...queue.filter((c) => c.kind === "reward")];
+      const extra = medalsNew.length - 3;
+      if (show.length === 0) return;
+      if (goalsRef.current.celebrate) {
+        setCelebrations((q) => [...q, ...show]);
+        if (extra > 0) setNotice(`Hai ottenuto altre ${extra} medaglie: le trovi in Traguardi.`);
+      } else {
+        setNotice(show.map((c) => c.title).join(" · ") + (extra > 0 ? ` · +${extra} medaglie` : ""));
+      }
+    };
+    const run = async () => {
+      if (syncing.current) return;
+      syncing.current = true;
+      try {
+        const g = goalsRef.current;
+        const { sessions: ss, tasks: tt } = dataRef.current;
+        const nowTs = Date.now();
+        const wk = weekStartOf(nowTs);
+        // 1) piano della settimana
+        if (!g.plan || g.plan.week !== wk) {
+          g.plan = planChallenges(ss, tt, nowTs);
+          await setSetting("challenges", g.plan);
+        }
+        // 2) sfide completate: +20 punti ciascuna
+        const fresh = g.plan.items.filter((c) => !g.plan!.doneIds.includes(c.id) && challengeProgress(c, ss, tt, nowTs) >= c.target);
+        if (fresh.length) {
+          g.plan = { ...g.plan, doneIds: [...g.plan.doneIds, ...fresh.map((c) => c.id)] };
+          g.bonus += 20 * fresh.length;
+          await Promise.all([setSetting("challenges", g.plan), setSetting("bonus", g.bonus)]);
+          setBonus(g.bonus);
+          fresh.forEach((c) => celebrate({ kind: "challenge", title: "Sfida completata!", text: `${c.title} · +20 punti` }));
+        }
+        setPlan2(g.plan);
+        // 3) medaglie e livello
+        const states = medalStates(computeMetrics(ss, tt, nowTs));
+        const lv = levelOf(computePoints(ss, tt, g.bonus, nowTs).total).level;
+        const nowSeen = { medals: Object.fromEntries(states.map((m) => [m.def.id, m.tier])), level: lv };
+        if (g.seen === null) {
+          g.seen = nowSeen; // primo avvio con questa funzione: niente festa per ciò che c'era già
+          await setSetting("seen", g.seen);
+        } else {
+          const TIERS = ["", "bronzo", "argento", "oro"];
+          for (const m of states) {
+            if (m.tier > (g.seen.medals[m.def.id] ?? 0)) celebrate({ kind: "medal", title: m.def.name, text: `Medaglia di ${TIERS[m.tier]}. ${m.def.why}`, icon: m.def.icon, tier: m.tier });
+          }
+          if (lv > g.seen.level) celebrate({ kind: "level", title: `Livello ${lv}: ${levelOf(computePoints(ss, tt, g.bonus, nowTs).total).name}`, text: "Stai costruendo qualcosa di solido, un blocco alla volta.", level: lv });
+          if (JSON.stringify(nowSeen) !== JSON.stringify(g.seen)) {
+            g.seen = { medals: { ...g.seen.medals, ...Object.fromEntries(states.map((m) => [m.def.id, Math.max(m.tier, g.seen!.medals[m.def.id] ?? 0)])) }, level: Math.max(lv, g.seen.level) };
+            await setSetting("seen", g.seen);
+          }
+        }
+        // 4) premio scelto dall'utente
+        const doneNow = g.plan.items.filter((c) => g.plan!.doneIds.includes(c.id) || challengeProgress(c, ss, tt, nowTs) >= c.target).length;
+        if (g.reward.text && doneNow >= g.reward.need && g.claimed !== wk && g.notified !== wk) {
+          g.notified = wk;
+          await setSetting("rewardNotified", wk);
+          celebrate({ kind: "reward", title: "Premio meritato!", text: `Hai completato ${g.reward.need} ${g.reward.need === 1 ? "sfida" : "sfide"}: ora puoi prenderti ${g.reward.text}.` });
+          if (document.hidden) void notify("Premio meritato!", `Ora puoi prenderti ${g.reward.text}.`);
+        }
+      } finally {
+        syncing.current = false;
+        flush();
+      }
+    };
+    void run();
+  }, [ready, goalsLoaded, sessions, tasks]);
 
   // Se un'app bloccata è stata aperta, il servizio ci ha riportato qui: mostra il promemoria.
   useEffect(() => {
@@ -246,6 +351,18 @@ export default function Home() {
   const todayMinutes = sessions.filter((s) => s.startedAt >= startOfDay(now)).reduce((sum, s) => sum + s.workMinutes, 0);
   const weekMinutes = sessions.filter((s) => s.startedAt >= weekStart(now)).reduce((sum, s) => sum + s.workMinutes, 0);
 
+  dataRef.current = { sessions, tasks };
+  const metrics = useMemo(() => computeMetrics(sessions, tasks, Date.now()), [sessions, tasks]);
+  const medals = useMemo(() => medalStates(metrics), [metrics]);
+  const points = useMemo(() => computePoints(sessions, tasks, bonus, Date.now()), [sessions, tasks, bonus]);
+  const level = levelOf(points.total);
+  const rhythm = useMemo(() => computeRhythm(sessions, Date.now()), [sessions]);
+  const challenges = useMemo(() => (plan2 && plan2.week === weekStartOf(Date.now()) ? plan2.items : []).map((c: Challenge) => {
+    const progress = challengeProgress(c, sessions, tasks, Date.now());
+    return { c, progress, done: progress >= c.target || (plan2?.doneIds ?? []).includes(c.id) };
+  }), [plan2, sessions, tasks]);
+  const doneCount = challenges.filter((c) => c.done).length;
+  const rewardReady = !!reward.text && doneCount >= reward.need && rewardClaimed !== weekStartOf(Date.now());
   const stats = useMemo(() => computeStats(sessions, tasks, Date.now(), startTime), [sessions, tasks, startTime]);
   const preview = useMemo(() => parseDidup(importText), [importText]);
   const toAdd = preview.filter((_, i) => !skipped.includes(i));
@@ -336,6 +453,27 @@ export default function Home() {
     setNotice("Hai 2 minuti: poi si torna al compito.");
   }
 
+  async function claimReward() {
+    const wk = weekStartOf(Date.now());
+    goalsRef.current.claimed = wk;
+    setRewardClaimed(wk);
+    await setSetting("rewardClaimed", wk);
+    setNotice("Goditelo: te lo sei meritato.");
+  }
+
+  async function changeReward(next: { text: string; need: number }) {
+    goalsRef.current.reward = next;
+    setReward(next);
+    await setSetting("reward", next);
+  }
+
+  async function toggleCelebrate() {
+    const next = !celebrateOn;
+    goalsRef.current.celebrate = next;
+    setCelebrateOn(next);
+    await setSetting("celebrate", next);
+  }
+
   async function toggleQuotes() {
     const next = !quotesOn;
     setQuotesOn(next);
@@ -391,7 +529,7 @@ export default function Home() {
     const start = Date.now();
     if (mode === "idle") {
       setSessionStart(start); setWorkSeconds(0); setLockedPlan(livePlan);
-      subjectMsRef.current = {}; blocksRef.current = 0; distractionsRef.current = 0;
+      subjectMsRef.current = {}; blocksRef.current = 0; distractionsRef.current = 0; resistedRef.current = 0;
     }
     setQuote(pickQuote("start"));
     startBlock(lockedPlan ?? livePlan);
@@ -438,6 +576,7 @@ export default function Home() {
         completedTaskIds: tasks.filter((t) => t.status === "done" && (t.completedAt || 0) >= sessionStart).map((t) => t.id),
         blocks: blocksRef.current,
         distractions: distractionsRef.current,
+        resisted: resistedRef.current,
         subjectMinutes: Object.fromEntries(Object.entries(subjectMsRef.current).map(([k, ms]) => [k, Math.round(ms / 60000)]).filter(([, m]) => (m as number) > 0))
       });
     }
@@ -465,7 +604,9 @@ export default function Home() {
       <header className="topbar">
         <span className="brand"><span className="brand-mark">f</span><span>filo</span></span>
         <span className="top-right">
-          <span className="suggested">{startTime} · {plan.work}+{plan.rest} min</span>
+          <button className="icon-btn" aria-label={view === "goals" ? "Torna ai compiti" : "Traguardi"} onClick={() => setView(view === "goals" ? "today" : "goals")}>
+            {view === "goals" ? <ArrowLeft size={18}/> : <Trophy size={18}/>}
+          </button>
           <button className="icon-btn" aria-label={view === "stats" ? "Torna ai compiti" : "Statistiche"} onClick={() => setView(view === "stats" ? "today" : "stats")}>
             {view === "stats" ? <ArrowLeft size={18}/> : <BarChart3 size={18}/>}
           </button>
@@ -473,7 +614,31 @@ export default function Home() {
         </span>
       </header>
 
-      {view === "stats" ? (
+      {view !== "goals" && (
+        <>
+          <button className="strip" onClick={() => setView("goals")} aria-label={`Livello ${level.level} ${level.name}, ${points.total} punti. Apri i traguardi`}>
+            <LevelBadge level={level.level} size={44}/>
+            <span className="strip-main">
+              <strong>{level.name}</strong>
+              <span className="strip-bar"><i style={{ width: `${level.pct}%` }}/></span>
+              <small>{points.total} pt{level.nextName ? ` · ${level.toNext} al livello ${level.level + 1}` : ""}</small>
+            </span>
+            <span className="strip-today bump" key={points.today}>+{points.today}<small>oggi</small></span>
+          </button>
+          {reward.text && (
+            <div className={rewardReady ? "reward-line ready" : "reward-line"}>
+              <Gift size={15}/>
+              <span>{rewardReady ? `Premio da ritirare: ${reward.text}` : `Premio: ${reward.text} · ${Math.min(doneCount, reward.need)}/${reward.need} sfide`}</span>
+              {rewardReady && <button className="install-go" onClick={() => void claimReward()}>Preso!</button>}
+            </div>
+          )}
+        </>
+      )}
+      {view === "goals" ? (
+        <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak}
+          challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
+          onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
+      ) : view === "stats" ? (
         <StatsView stats={stats} quote={quotesOn ? quote ?? pickQuote("idle") : null}/>
       ) : (<>
       {install.visible && !native && (
@@ -493,6 +658,7 @@ export default function Home() {
       <section className="timer-card">
         <div className="timer-top">
           <span className="pill"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
+          <span className="duration-setting">{startTime} · {plan.work}+{plan.rest} min</span>
         </div>
         <p className="current-task">
           {current ? <><small>Adesso</small>{current.title}</> : <small>Aggiungi un compito per iniziare</small>}
@@ -634,6 +800,20 @@ export default function Home() {
       <p className="privacy-note">I tuoi dati restano su questo dispositivo. Nessun account.</p>
       </>)}
 
+      {celebrations[0] && (
+        <div className="modal-backdrop" role="presentation" style={{ zIndex: 40 }}>
+          <section className="settings-modal celebrate" role="alertdialog" aria-labelledby="celebrate-title">
+            <p className="eyebrow">{celebrations[0].kind === "medal" ? "NUOVA MEDAGLIA" : celebrations[0].kind === "level" ? "LIVELLO SUPERATO" : celebrations[0].kind === "reward" ? "PREMIO" : "SFIDA"}</p>
+            {celebrations[0].kind === "medal" && <Medal icon={celebrations[0].icon!} tier={celebrations[0].tier!} size={124} pop/>}
+            {celebrations[0].kind === "level" && <LevelBadge level={celebrations[0].level!} size={104}/>}
+            {(celebrations[0].kind === "challenge" || celebrations[0].kind === "reward") && <span className="lvl-badge" style={{ width: 104, height: 104, margin: "18px auto 26px" }}><Gift size={46}/></span>}
+            <h2 id="celebrate-title">{celebrations[0].title}</h2>
+            <p className="subhead">{celebrations[0].text}</p>
+            <button className="primary-btn dark full-btn" onClick={() => setCelebrations((q) => q.slice(1))}>{celebrations.length > 1 ? `Continua (${celebrations.length - 1} altre)` : "Continua"}</button>
+          </section>
+        </div>
+      )}
+
       {blockedApp && mode === "work" && (
         <div className="modal-backdrop" role="presentation" style={{ zIndex: 30 }}>
           <section className="settings-modal blocked-card" role="alertdialog" aria-labelledby="blocked-title">
@@ -641,7 +821,7 @@ export default function Home() {
             <h2 id="blocked-title">{blockedApp} aspetta la pausa.</h2>
             <p className="subhead">Mancano {formatTime(remaining)}. Un compito alla volta: {current ? `“${current.title}”` : "resta su Filo"}.</p>
             {quotesOn && blockedQuote && <p className="quote">{blockedQuote}</p>}
-            <button className="primary-btn dark full-btn" onClick={() => setBlockedApp(null)}>Resto sul compito</button>
+            <button className="primary-btn dark full-btn" onClick={() => { resistedRef.current++; setBlockedApp(null); }}>Resto sul compito</button>
             <button className="danger-link" onClick={() => void needTwoMinutes()}>Mi servono 2 minuti</button>
           </section>
         </div>
@@ -727,6 +907,20 @@ export default function Home() {
             <div className="notification-row">
               <div><strong>Frasi motivazionali</strong><span>Una frase breve all’inizio di blocchi e pause, a fine sessione e quando chiudi un compito.</span></div>
               <button className={quotesOn ? "toggle on" : "toggle"} onClick={toggleQuotes} type="button" role="switch" aria-checked={quotesOn} aria-label="Frasi motivazionali"><span/></button>
+            </div>
+            <div className="notification-row">
+              <div><strong>Celebrazioni e animazioni</strong><span>Medaglie, livelli e sfide con una piccola festa. Se spento, solo un messaggio.</span></div>
+              <button className={celebrateOn ? "toggle on" : "toggle"} onClick={toggleCelebrate} type="button" role="switch" aria-checked={celebrateOn} aria-label="Celebrazioni e animazioni"><span/></button>
+            </div>
+            <div className="reward-edit">
+              <strong>Il tuo premio</strong>
+              <span>Qualcosa di vero che ti piace: te lo ricordo io quando completi le sfide della settimana.</span>
+              <input value={reward.text} maxLength={60} placeholder="es. Serata film, gelato, 1 ora di gioco…" aria-label="Premio personale" onChange={(e) => void changeReward({ ...reward, text: e.target.value })}/>
+              <label>Sfide da completare ogni settimana:
+                <select value={reward.need} aria-label="Sfide necessarie" onChange={(e) => void changeReward({ ...reward, need: Number(e.target.value) })}>
+                  <option value={1}>1</option><option value={2}>2</option><option value={3}>3 (tutte)</option>
+                </select>
+              </label>
             </div>
             <div className="sound-test">
               <strong>Suoni</strong>

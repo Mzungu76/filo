@@ -9,7 +9,7 @@ const ICONS: Record<MedalIcon, typeof Clock3> = {
 };
 
 /** Medaglia: disco metallico (bronzo/argento/oro) con nastro, riflesso animato e icona. `pop` la fa comparire con festa. */
-export default function Medal({ icon, tier, size = 76, pop = false }: { icon: MedalIcon; tier: Tier; size?: number; pop?: boolean }) {
+export default function Medal({ icon, tier, size = 76, pop = false, record }: { icon: MedalIcon; tier: Tier; size?: number; pop?: boolean; record?: Tier }) {
   const Icon = ICONS[icon];
   return (
     <span className={`medal t${tier}${pop ? " pop" : ""}`} style={{ width: size, height: size }} aria-hidden="true">
@@ -18,6 +18,7 @@ export default function Medal({ icon, tier, size = 76, pop = false }: { icon: Me
         <Icon size={Math.round(size * 0.4)} strokeWidth={2.1}/>
         {tier > 0 && <span className="medal-shine"/>}
       </span>
+      {record !== undefined && record > tier && <span className={`medal-record t${record}`} title="Il tuo record"/>}
       {pop && Array.from({ length: 8 }, (_, i) => <i className="spark" style={{ "--a": `${i * 45}deg`, "--d": `${i % 2 ? 0.05 : 0}s` } as React.CSSProperties} key={i}/>)}
     </span>
   );

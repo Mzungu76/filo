@@ -271,3 +271,21 @@ h2{font-size:20px;line-height:1.2}
 .reward-edit input{border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px;background:white;color:var(--ink)}
 .reward-edit label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-soft)}
 .reward-edit select{border:1px solid var(--line);border-radius:9px;padding:7px 9px;font:inherit;font-size:12px;background:white;color:var(--ink)}
+
+/* Platino e diamante */
+.medal.t4{--hi:#f4f8ff;--mid:#aebfe0;--lo:#5f78a6;--ink:#1f3358}
+.medal.t5{--hi:#e6fdff;--mid:#6fd6ea;--lo:#1f86ad;--ink:#06384f}
+.medal.t5 .medal-disc{box-shadow:inset 0 0 0 3px rgba(255,255,255,.55),inset 0 -5px 10px rgba(0,60,90,.2),0 6px 18px rgba(63,190,220,.45)}
+.medal.t5 .medal-shine,.medal.t4 .medal-shine{animation-duration:3s}
+.medal-record{position:absolute;right:-4%;top:-4%;z-index:3;width:28%;height:28%;border-radius:50%;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,.25);
+  background:radial-gradient(circle at 30% 25%,var(--hi),var(--mid) 60%,var(--lo));opacity:.95}
+.medal-record.t1{--hi:#f1c9a5;--mid:#c98a5b;--lo:#86502d}.medal-record.t2{--hi:#fbfdff;--mid:#c4ced8;--lo:#8695a3}
+.medal-record.t3{--hi:#fff0b0;--mid:#f0c14b;--lo:#b97f0f}.medal-record.t4{--hi:#f4f8ff;--mid:#aebfe0;--lo:#5f78a6}.medal-record.t5{--hi:#e6fdff;--mid:#6fd6ea;--lo:#1f86ad}
+.medal-cell.risk{border-color:#e3a76b;background:#fffaf3}
+.risk-chip{font-size:10px;font-weight:700;color:#9a5a32;background:#f6e6dc;border-radius:99px;padding:2px 8px}
+.keep-list{display:flex;flex-direction:column;gap:9px}
+.keep-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:14px;background:#fffaf3;border:1px solid #efd3b4}
+.keep-item div{flex:1;display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--ink-soft);line-height:1.4}.keep-item strong{font-size:13px;color:var(--ink)}
+.keep-item .medal{margin:0 4px 0 0}
+.tier-row .tier-name{color:var(--ink)}
+.keep-item{text-align:left;color:var(--ink)}

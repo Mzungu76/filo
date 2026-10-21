@@ -13,7 +13,7 @@ import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
 import GoalsView from "./GoalsView";
 import Medal, { LevelBadge } from "./Medal";
-import { challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
+import { TIER_NAMES, challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
 import { weekStart as weekStartOf } from "@/lib/stats";
 import { SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
@@ -98,8 +98,9 @@ export default function Home() {
   const [celebrateOn, setCelebrateOn] = useState(true);
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const [goalsLoaded, setGoalsLoaded] = useState(false);
-  const goalsRef = useRef<{ plan: ChallengePlan | null; bonus: number; seen: { medals: Record<string, number>; level: number } | null; reward: { text: string; need: number }; claimed: number; notified: number; celebrate: boolean }>(
-    { plan: null, bonus: 0, seen: null, reward: { text: "", need: 2 }, claimed: 0, notified: 0, celebrate: true });
+  const [records, setRecords] = useState<Record<string, number>>({});
+  const goalsRef = useRef<{ plan: ChallengePlan | null; bonus: number; seen: { medals: Record<string, number>; level: number } | null; records: Record<string, number>; reward: { text: string; need: number }; claimed: number; notified: number; celebrate: boolean }>(
+    { plan: null, bonus: 0, seen: null, records: {}, reward: { text: "", need: 2 }, claimed: 0, notified: 0, celebrate: true });
   const dataRef = useRef<{ sessions: StudySession[]; tasks: Task[] }>({ sessions: [], tasks: [] });
   const syncing = useRef(false);
   const resistedRef = useRef(0);
@@ -141,13 +142,14 @@ export default function Home() {
     setAlertsOn(savedAlerts);
     setStartTime(savedStart);
     const g = goalsRef.current;
-    const [gPlan, gBonus, gSeen, gReward, gClaimed, gNotified, gCelebrate] = await Promise.all([
+    const [gPlan, gBonus, gSeen, gRecords, gReward, gClaimed, gNotified, gCelebrate] = await Promise.all([
       getSetting<ChallengePlan | null>("challenges", null), getSetting("bonus", 0),
-      getSetting<{ medals: Record<string, number>; level: number } | null>("seen", null),
+      getSetting<{ medals: Record<string, number>; level: number } | null>("seen2", null),
+      getSetting<Record<string, number>>("records", {}),
       getSetting("reward", { text: "", need: 2 }), getSetting("rewardClaimed", 0), getSetting("rewardNotified", 0), getSetting("celebrate", true)
     ]);
-    Object.assign(g, { plan: gPlan, bonus: gBonus, seen: gSeen, reward: gReward, claimed: gClaimed, notified: gNotified, celebrate: gCelebrate });
-    setPlan2(gPlan); setBonus(gBonus); setReward(gReward); setRewardClaimed(gClaimed); setCelebrateOn(gCelebrate);
+    Object.assign(g, { plan: gPlan, bonus: gBonus, seen: gSeen, records: gRecords, reward: gReward, claimed: gClaimed, notified: gNotified, celebrate: gCelebrate });
+    setPlan2(gPlan); setRecords(gRecords); setBonus(gBonus); setReward(gReward); setRewardClaimed(gClaimed); setCelebrateOn(gCelebrate);
     setGoalsLoaded(true);
     setTasks(nextTasks);
     setSessions(nextSessions);
@@ -203,6 +205,7 @@ export default function Home() {
     if (!ready || !goalsLoaded) return;
     // Raccoglie le feste di questo giro e ne mostra poche: medaglie migliori, livello, sfide unite, premio.
     const queue: Celebration[] = [];
+    const lostNames: string[] = [];
     const celebrate = (c: Celebration) => { queue.push(c); };
     const flush = () => {
       const medalsNew = queue.filter((c) => c.kind === "medal").sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0));
@@ -212,13 +215,15 @@ export default function Home() {
         : challengesNew;
       const show = [...medalsNew.slice(0, 3), ...queue.filter((c) => c.kind === "level"), ...merged, ...queue.filter((c) => c.kind === "reward")];
       const extra = medalsNew.length - 3;
-      if (show.length === 0) return;
-      if (goalsRef.current.celebrate) {
+      const messages: string[] = [];
+      if (lostNames.length) messages.push(`Sono scese di livello: ${lostNames.join(", ")}. Un po' di studio e le riprendi: il record resta tuo.`);
+      if (show.length > 0 && goalsRef.current.celebrate) {
         setCelebrations((q) => [...q, ...show]);
-        if (extra > 0) setNotice(`Hai ottenuto altre ${extra} medaglie: le trovi in Traguardi.`);
-      } else {
-        setNotice(show.map((c) => c.title).join(" · ") + (extra > 0 ? ` · +${extra} medaglie` : ""));
+        if (extra > 0) messages.push(`Hai ottenuto altre ${extra} medaglie: le trovi in Traguardi.`);
+      } else if (show.length > 0) {
+        messages.push(show.map((c) => c.title).join(" · ") + (extra > 0 ? ` · +${extra} medaglie` : ""));
       }
+      if (messages.length) setNotice(messages.join(" "));
     };
     const run = async () => {
       if (syncing.current) return;
@@ -243,23 +248,30 @@ export default function Home() {
           fresh.forEach((c) => celebrate({ kind: "challenge", title: "Sfida completata!", text: `${c.title} · +20 punti` }));
         }
         setPlan2(g.plan);
-        // 3) medaglie e livello
+        // 3) medaglie (contano le ultime 4 settimane: possono salire e scendere) e livello (non scende mai)
         const states = medalStates(computeMetrics(ss, tt, nowTs));
-        const lv = levelOf(computePoints(ss, tt, g.bonus, nowTs).total).level;
-        const nowSeen = { medals: Object.fromEntries(states.map((m) => [m.def.id, m.tier])), level: lv };
+        const pts = levelOf(computePoints(ss, tt, g.bonus, nowTs).total);
+        const tiersNow = Object.fromEntries(states.map((m) => [m.def.id, m.tier]));
         if (g.seen === null) {
-          g.seen = nowSeen; // primo avvio con questa funzione: niente festa per ciò che c'era già
-          await setSetting("seen", g.seen);
+          g.seen = { medals: tiersNow, level: pts.level }; // primo avvio con questa funzione: niente festa per ciò che c'era già
+          g.records = { ...tiersNow };
+          await Promise.all([setSetting("seen2", g.seen), setSetting("records", g.records)]);
+          setRecords(g.records);
         } else {
-          const TIERS = ["", "bronzo", "argento", "oro"];
           for (const m of states) {
-            if (m.tier > (g.seen.medals[m.def.id] ?? 0)) celebrate({ kind: "medal", title: m.def.name, text: `Medaglia di ${TIERS[m.tier]}. ${m.def.why}`, icon: m.def.icon, tier: m.tier });
+            const before = g.seen.medals[m.def.id] ?? 0;
+            const best = g.records[m.def.id] ?? 0;
+            if (m.tier > before) {
+              celebrate({ kind: "medal", title: m.tier <= best ? `${m.def.name}: riconquistata!` : m.def.name, text: `Medaglia di ${TIER_NAMES[m.tier].toLowerCase()}. ${m.def.why}`, icon: m.def.icon, tier: m.tier });
+            } else if (m.tier < before) {
+              lostNames.push(`${m.def.name} (${m.tier === 0 ? "persa" : TIER_NAMES[m.tier].toLowerCase()})`);
+            }
           }
-          if (lv > g.seen.level) celebrate({ kind: "level", title: `Livello ${lv}: ${levelOf(computePoints(ss, tt, g.bonus, nowTs).total).name}`, text: "Stai costruendo qualcosa di solido, un blocco alla volta.", level: lv });
-          if (JSON.stringify(nowSeen) !== JSON.stringify(g.seen)) {
-            g.seen = { medals: { ...g.seen.medals, ...Object.fromEntries(states.map((m) => [m.def.id, Math.max(m.tier, g.seen!.medals[m.def.id] ?? 0)])) }, level: Math.max(lv, g.seen.level) };
-            await setSetting("seen", g.seen);
-          }
+          if (pts.level > g.seen.level) celebrate({ kind: "level", title: `Livello ${pts.level}: ${pts.name}`, text: "Stai costruendo qualcosa di solido, un blocco alla volta.", level: pts.level });
+          const nextSeen = { medals: tiersNow, level: Math.max(pts.level, g.seen.level) };
+          const nextRecords = { ...g.records, ...Object.fromEntries(states.map((m) => [m.def.id, Math.max(m.tier, g.records[m.def.id] ?? 0)])) };
+          if (JSON.stringify(nextSeen) !== JSON.stringify(g.seen)) { g.seen = nextSeen; await setSetting("seen2", g.seen); }
+          if (JSON.stringify(nextRecords) !== JSON.stringify(g.records)) { g.records = nextRecords; await setSetting("records", g.records); setRecords(g.records); }
         }
         // 4) premio scelto dall'utente
         const doneNow = g.plan.items.filter((c) => g.plan!.doneIds.includes(c.id) || challengeProgress(c, ss, tt, nowTs) >= c.target).length;
@@ -353,7 +365,9 @@ export default function Home() {
 
   dataRef.current = { sessions, tasks };
   const metrics = useMemo(() => computeMetrics(sessions, tasks, Date.now()), [sessions, tasks]);
-  const medals = useMemo(() => medalStates(metrics), [metrics]);
+  const metricsLater = useMemo(() => computeMetrics(sessions, tasks, Date.now() + 7 * 24 * 3600 * 1000), [sessions, tasks]);
+  const medals = useMemo(() => medalStates(metrics, metricsLater), [metrics, metricsLater]);
+  const atRisk = medals.filter((m) => m.riskNeed !== null).length;
   const points = useMemo(() => computePoints(sessions, tasks, bonus, Date.now()), [sessions, tasks, bonus]);
   const level = levelOf(points.total);
   const rhythm = useMemo(() => computeRhythm(sessions, Date.now()), [sessions]);
@@ -621,7 +635,7 @@ export default function Home() {
             <span className="strip-main">
               <strong>{level.name}</strong>
               <span className="strip-bar"><i style={{ width: `${level.pct}%` }}/></span>
-              <small>{points.total} pt{level.nextName ? ` · ${level.toNext} al livello ${level.level + 1}` : ""}</small>
+              <small>{points.total} pt{level.nextName ? ` · ${level.toNext} al livello ${level.level + 1}` : ""}{atRisk > 0 ? ` · ${atRisk} da mantenere` : ""}</small>
             </span>
             <span className="strip-today bump" key={points.today}>+{points.today}<small>oggi</small></span>
           </button>
@@ -635,7 +649,7 @@ export default function Home() {
         </>
       )}
       {view === "goals" ? (
-        <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak}
+        <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
           challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
           onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
       ) : view === "stats" ? (

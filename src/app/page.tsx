@@ -275,12 +275,12 @@ export default function Home() {
                 </>
               ) : mode === "break" ? (
                 <>
-                  <button className="primary-btn" onClick={resumeWork}><Play size={17} fill="currentColor}/> Riprendi</button>
+                  <button className="primary-btn" onClick={resumeWork}><Play size={17} fill="currentColor"/> Riprendi</button>
                   <button className="secondary-btn" onClick={finishSession}><Check size={17}/> Chiudi sessione</button>
                 </>
               ) : (
                 <>
-                  <button className="primary-btn" onClick={resumeWork}><Play size={17} fill="currentColor}/> Riprendi</button>
+                  <button className="primary-btn" onClick={resumeWork}><Play size={17} fill="currentColor"/> Riprendi</button>
                   <button className="secondary-btn" onClick={finishSession}><Square size={15}/> Chiudi sessione</button>
                 </>
               )}

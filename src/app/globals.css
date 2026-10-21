@@ -306,37 +306,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .tier-row b{color:var(--ok-ink)}.tier-row .tier-name{color:var(--ink)}
 
 /* ===== Medaglie ===== */
-.medal{position:relative;display:inline-block;flex:0 0 auto;--hi:#eef1f4;--mid:#cfd6dc;--lo:#9aa5ae;--ink:#6c7882}
-.medal.t1{--hi:#f1c9a5;--mid:#c98a5b;--lo:#86502d;--ink:#fff6ee}
-.medal.t2{--hi:#fbfdff;--mid:#c4ced8;--lo:#8695a3;--ink:#33414d}
-.medal.t3{--hi:#fff0b0;--mid:#f0c14b;--lo:#b97f0f;--ink:#5a3a00}
-.medal.t4{--hi:#f4f8ff;--mid:#aebfe0;--lo:#5f78a6;--ink:#1f3358}
-.medal.t5{--hi:#e6fdff;--mid:#6fd6ea;--lo:#1f86ad;--ink:#06384f}
-.medal-ribbon{position:absolute;left:0;right:0;bottom:-12%;height:40%;z-index:0}
-.medal-ribbon::before,.medal-ribbon::after{content:"";position:absolute;top:0;width:30%;height:100%;background:linear-gradient(#2f6f8f,#1c4a63);clip-path:polygon(0 0,100% 0,100% 100%,50% 80%,0 100%)}
-.medal-ribbon::before{left:22%;transform:rotate(14deg)}.medal-ribbon::after{right:22%;transform:rotate(-14deg);background:linear-gradient(#3d86a8,#245b78)}
-.medal.t0 .medal-ribbon{display:none}
-.medal-disc{position:absolute;inset:0;z-index:1;display:grid;place-items:center;border-radius:50%;color:var(--ink);overflow:hidden;background:radial-gradient(circle at 30% 24%,var(--hi),var(--mid) 56%,var(--lo));box-shadow:inset 0 0 0 3px rgba(255,255,255,.38),inset 0 -5px 10px rgba(0,0,0,.14),0 6px 14px rgba(0,0,0,.22)}
-.medal-disc::before{content:"";position:absolute;inset:13%;border-radius:50%;border:2px solid rgba(255,255,255,.5);box-shadow:inset 0 2px 4px rgba(0,0,0,.12)}
-.medal-disc svg{position:relative;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
-.medal.t0 .medal-disc{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--surface-3);color:var(--muted)}
-.medal.t0 .medal-disc::before{border:2px dashed var(--surface-3);box-shadow:none}
-.medal.t5 .medal-disc{box-shadow:inset 0 0 0 3px rgba(255,255,255,.55),inset 0 -5px 10px rgba(0,60,90,.2),0 6px 18px rgba(63,190,220,.45)}
-.medal-shine{position:absolute;inset:0;border-radius:50%;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.75) 50%,transparent 62%);background-size:260% 100%;background-position:130% 0;animation:medal-shine 4.2s ease-in-out infinite}
-.medal.t4 .medal-shine,.medal.t5 .medal-shine{animation-duration:3s}
-@keyframes medal-shine{0%,55%{background-position:130% 0}100%{background-position:-60% 0}}
-.medal.pop{animation:medal-pop .9s cubic-bezier(.2,1.2,.3,1) both}
-@keyframes medal-pop{0%{transform:scale(.15) rotate(-30deg);opacity:0}55%{transform:scale(1.2) rotate(7deg);opacity:1}78%{transform:scale(.94) rotate(-3deg)}100%{transform:scale(1) rotate(0)}}
-.spark{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;background:#ffd95a;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);opacity:0;animation:spark 1.1s ease-out var(--d) .35s both}
-@keyframes spark{0%{opacity:0;transform:rotate(var(--a)) translateY(0) scale(.3)}25%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateY(-92px) scale(1)}}
-.medal-record{position:absolute;right:-4%;top:-4%;z-index:3;width:28%;height:28%;border-radius:50%;border:2px solid var(--surface);box-shadow:0 2px 5px rgba(0,0,0,.25);background:radial-gradient(circle at 30% 25%,var(--hi),var(--mid) 60%,var(--lo));opacity:.95}
-.medal-record.t1{--hi:#f1c9a5;--mid:#c98a5b;--lo:#86502d}.medal-record.t2{--hi:#fbfdff;--mid:#c4ced8;--lo:#8695a3}.medal-record.t3{--hi:#fff0b0;--mid:#f0c14b;--lo:#b97f0f}.medal-record.t4{--hi:#f4f8ff;--mid:#aebfe0;--lo:#5f78a6}.medal-record.t5{--hi:#e6fdff;--mid:#6fd6ea;--lo:#1f86ad}
 .lvl-badge{display:inline-grid;place-items:center;flex:0 0 auto;border-radius:50%;font-family:Manrope,sans-serif;font-weight:800;color:#5a3a00;background:radial-gradient(circle at 30% 24%,#fff0b0,#f0c14b 56%,#b97f0f);box-shadow:inset 0 0 0 2px rgba(255,255,255,.45),0 3px 8px rgba(185,127,15,.35)}
 
 /* ===== Movimento ridotto ===== */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-  .spark,.medal-shine,.breath{display:none}
+  .breath{display:none}
 }
 .typing .bottom-nav,.typing .mini-player{display:none}
 
@@ -463,3 +438,20 @@ p{text-wrap:pretty}
 .city-ctl button{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.9);color:#12232e;box-shadow:0 4px 12px rgba(10,30,45,.2)}
 .city-box.night .city-ctl button{background:rgba(255,255,255,.14);color:#e6f1f6;box-shadow:none}
 .settings-modal.celebrate,.settings-modal.blocked-card{padding-top:22px}
+
+/* Edifici (al posto delle medaglie) */
+.bld{position:relative;display:inline-block;flex:0 0 auto}
+.bld svg{display:block;overflow:visible}
+.bld.locked{opacity:.5;filter:grayscale(.6)}
+.bld.pop{animation:bld-pop .9s cubic-bezier(.2,1.2,.3,1) both}
+@keyframes bld-pop{0%{transform:scale(.2) translateY(30px);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.bld-record{position:absolute;right:2%;top:2%;width:12px;height:12px;border-radius:50%;background:#ffc857;border:2px solid var(--surface);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.medal-name small{display:block;margin-top:2px;font-size:11px;font-weight:500;color:var(--muted)}
+.celebrate .bld,.medal-sheet .bld{display:block;margin:6px auto 14px}
+.keep-item .bld,.tier-row .bld{margin:0 4px 0 0}
+.medal-cell .bld{margin-bottom:4px}
+/* Pannello compiti: chiusura */
+.sheet-top{display:flex;align-items:center;gap:8px}
+.sheet-top .mini-hero{flex:1;min-width:0}
+.sheet-close-btn{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:var(--surface-2);color:var(--ink)}
+.sheet-scrim{position:fixed;left:0;right:0;top:0;bottom:var(--nav-h);z-index:14}

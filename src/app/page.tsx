@@ -13,7 +13,8 @@ import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
 import { BigRing, Ring, subjectHue, tap } from "./ui";
 import GoalsView from "./GoalsView";
-import Medal, { LevelBadge } from "./Medal";
+import { LevelBadge } from "./LevelBadge";
+import BuildingIcon, { BUILDING_NAME } from "./Buildings";
 import { TIER_NAMES, challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
 import { weekStart as weekStartOf } from "@/lib/stats";
 import { CHECK_PATH, THREAD_PATH } from "@/lib/brandPath";
@@ -247,7 +248,7 @@ export default function Home() {
     return () => document.removeEventListener("visibilitychange", check);
   }, [native]);
 
-  // Traguardi: sfide della settimana, nuove medaglie, livelli e premio. Tutto derivato dai dati: niente da dichiarare a mano.
+  // Città: sfide della settimana, nuovi edifici, livelli e premio. Tutto derivato dai dati: niente da dichiarare a mano.
   useEffect(() => {
     if (!ready || !goalsLoaded) return;
     // Raccoglie le feste di questo giro e ne mostra poche: medaglie migliori, livello, sfide unite, premio.
@@ -263,12 +264,12 @@ export default function Home() {
       const show = [...medalsNew.slice(0, 3), ...queue.filter((c) => c.kind === "level"), ...merged, ...queue.filter((c) => c.kind === "reward")];
       const extra = medalsNew.length - 3;
       const messages: string[] = [];
-      if (lostNames.length) messages.push(`Sono scese di livello: ${lostNames.join(", ")}. Un po' di studio e le riprendi: il record resta tuo.`);
+      if (lostNames.length) messages.push(`Si sono spenti o ridotti: ${lostNames.join(", ")}. Un po' di studio e li riaccendi: il record resta tuo.`);
       if (show.length > 0 && goalsRef.current.celebrate) {
         setCelebrations((q) => [...q, ...show]);
-        if (extra > 0) messages.push(`Hai ottenuto altre ${extra} medaglie: le trovi in Traguardi.`);
+        if (extra > 0) messages.push(`Hai costruito altri ${extra} edifici: li trovi in Città.`);
       } else if (show.length > 0) {
-        messages.push(show.map((c) => c.title).join(" · ") + (extra > 0 ? ` · +${extra} medaglie` : ""));
+        messages.push(show.map((c) => c.title).join(" · ") + (extra > 0 ? ` · +${extra} edifici` : ""));
       }
       if (messages.length) setNotice(messages.join(" "));
     };
@@ -309,9 +310,9 @@ export default function Home() {
             const before = g.seen.medals[m.def.id] ?? 0;
             const best = g.records[m.def.id] ?? 0;
             if (m.tier > before) {
-              celebrate({ kind: "medal", title: m.tier <= best ? `${m.def.name}: riconquistata!` : m.def.name, text: `Medaglia di ${TIER_NAMES[m.tier].toLowerCase()}. ${m.def.why}`, icon: m.def.icon, tier: m.tier });
+              celebrate({ kind: "medal", title: `${BUILDING_NAME[m.def.icon]}: ${best === 0 ? "nuovo edificio!" : m.tier <= best ? "di nuovo acceso!" : "ampliato!"}`, text: `${m.def.name} · ${TIER_NAMES[m.tier]}. ${m.def.why}`, icon: m.def.icon, tier: m.tier });
             } else if (m.tier < before) {
-              lostNames.push(`${m.def.name} (${m.tier === 0 ? "persa" : TIER_NAMES[m.tier].toLowerCase()})`);
+              lostNames.push(`${BUILDING_NAME[m.def.icon]} (${m.tier === 0 ? "spento" : TIER_NAMES[m.tier].toLowerCase()})`);
             }
           }
           if (pts.level > g.seen.level) celebrate({ kind: "level", title: `Livello ${pts.level}: ${pts.name}`, text: "Stai costruendo qualcosa di solido, un blocco alla volta.", level: pts.level });
@@ -604,14 +605,15 @@ export default function Home() {
     setTimeout(() => addRef.current?.focus(), 380);
   }
   // Pannello dei compiti: si tira su/giù, oppure si tocca la maniglia.
+  const closeSheet = () => { setSheetOpen(false); (document.activeElement as HTMLElement | null)?.blur?.(); };
   const sheetDown = (e: React.PointerEvent) => { dragY.current = e.clientY; };
   const sheetUp = (e: React.PointerEvent) => {
     if (dragY.current === null) return;
     const dy = e.clientY - dragY.current;
     dragY.current = null;
     if (dy < -28) setSheetOpen(true);
-    else if (dy > 28) setSheetOpen(false);
-    else if (Math.abs(dy) < 8 && !(e.target as HTMLElement).closest("button")) setSheetOpen((o) => !o);
+    else if (dy > 28) closeSheet();
+    else if (Math.abs(dy) < 14 && !(e.target as HTMLElement).closest("button")) (sheetOpen ? closeSheet() : setSheetOpen(true));
   };
 
   function startWork() {
@@ -884,10 +886,12 @@ export default function Home() {
         {quotesOn && quote && mode === "idle" && <p className="quote on-dark">{quote}</p>}
       </section>
 
+      {sheetOpen && <div className="sheet-scrim" onMouseDown={(e) => e.preventDefault()} onClick={closeSheet}/>}
       <div className={sheetOpen ? "sheet open" : "sheet"} role="region" aria-label="Compiti">
-        <div className="sheet-head" onPointerDown={sheetDown} onPointerUp={sheetUp} onPointerCancel={() => { dragY.current = null; }}>
+        <div className="sheet-head" onMouseDown={(e) => e.preventDefault()} onPointerDown={sheetDown} onPointerUp={sheetUp} onPointerCancel={() => { dragY.current = null; }}>
           <span className="grabber" aria-hidden="true"/>
           {sheetOpen ? (
+            <div className="sheet-top">
             <div className="mini-hero">
               <span className="mini-time">{formatTime(shown)}</span>
               <span className="mini-info">{ringLabel}</span>
@@ -896,6 +900,8 @@ export default function Home() {
                 : mode === "work"
                   ? <button className="mini-play" onClick={pauseTimer} aria-label="Pausa"><Pause size={18} fill="currentColor"/></button>
                   : <button className="mini-play" onClick={resumeWork} aria-label="Riprendi"><Play size={18} fill="currentColor"/></button>}
+            </div>
+              <button className="sheet-close-btn" onClick={closeSheet} aria-label="Chiudi i compiti"><ChevronDown size={24}/></button>
             </div>
           ) : (
             <div className="peek">
@@ -1008,8 +1014,8 @@ export default function Home() {
       {celebrations[0] && (
         <div className="modal-backdrop" role="presentation" style={{ zIndex: 40 }}>
           <section className="settings-modal celebrate" role="alertdialog" aria-labelledby="celebrate-title">
-            <p className="eyebrow">{celebrations[0].kind === "medal" ? "NUOVA MEDAGLIA" : celebrations[0].kind === "level" ? "LIVELLO SUPERATO" : celebrations[0].kind === "reward" ? "PREMIO" : "SFIDA"}</p>
-            {celebrations[0].kind === "medal" && <Medal icon={celebrations[0].icon!} tier={celebrations[0].tier!} size={124} pop/>}
+            <p className="eyebrow">{celebrations[0].kind === "medal" ? "NUOVO EDIFICIO" : celebrations[0].kind === "level" ? "LIVELLO SUPERATO" : celebrations[0].kind === "reward" ? "PREMIO" : "SFIDA"}</p>
+            {celebrations[0].kind === "medal" && <BuildingIcon icon={celebrations[0].icon!} tier={celebrations[0].tier!} size={150} pop/>}
             {celebrations[0].kind === "level" && <LevelBadge level={celebrations[0].level!} size={104}/>}
             {(celebrations[0].kind === "challenge" || celebrations[0].kind === "reward") && <span className="lvl-badge" style={{ width: 104, height: 104, margin: "18px auto 26px" }}><Gift size={46}/></span>}
             <h2 id="celebrate-title">{celebrations[0].title}</h2>
@@ -1124,7 +1130,7 @@ export default function Home() {
               <button className={quotesOn ? "toggle on" : "toggle"} onClick={toggleQuotes} type="button" role="switch" aria-checked={quotesOn} aria-label="Frasi motivazionali"><span/></button>
             </div>
             <div className="notification-row">
-              <div><strong>Celebrazioni e animazioni</strong><span>Medaglie, livelli e sfide con una piccola festa. Se spento, solo un messaggio.</span></div>
+              <div><strong>Celebrazioni e animazioni</strong><span>Nuovi edifici, livelli e sfide con una piccola festa. Se spento, solo un messaggio.</span></div>
               <button className={celebrateOn ? "toggle on" : "toggle"} onClick={toggleCelebrate} type="button" role="switch" aria-checked={celebrateOn} aria-label="Celebrazioni e animazioni"><span/></button>
             </div>
             <div className="reward-edit">

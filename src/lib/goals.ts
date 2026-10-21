@@ -6,7 +6,7 @@ const WEEK = 7 * DAY;
 
 /** 0 = non ottenuta, 1 bronzo, 2 argento, 3 oro, 4 platino, 5 diamante. */
 export type Tier = 0 | 1 | 2 | 3 | 4 | 5;
-export const TIER_NAMES = ["Da ottenere", "Bronzo", "Argento", "Oro", "Platino", "Diamante"];
+export const TIER_NAMES = ["Da costruire", "Livello 1", "Livello 2", "Livello 3", "Livello 4", "Livello 5"];
 /** Le medaglie contano quello che fai nelle ultime 4 settimane: vanno mantenute. */
 export const WINDOW_DAYS = 28;
 export type MedalIcon =

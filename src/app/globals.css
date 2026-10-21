@@ -400,7 +400,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .link-btn{display:block;margin:10px auto 0;min-height:40px;padding:0 10px;font-size:12px;font-weight:600;color:var(--muted);text-decoration:underline}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet,.big-prog{transition:none}.modal-scrim{animation:none}}
-.typing .sheet{display:none}
+.typing .sheet{bottom:0}.typing .sheet.open{height:calc(100dvh - 56px)}
 
 /* ===== Tipografia e pagine allineate alla home ===== */
 h1{font-size:clamp(26px,7.4vw,32px);line-height:1.12;letter-spacing:-.9px;text-wrap:balance}
@@ -442,3 +442,8 @@ p{text-wrap:pretty}
 .focus-ring .big-state{color:rgba(255,255,255,.8)}
 .focus-ring .big-ring svg{transform:none}
 .focus-ring .big-state{display:none}.focus-ring .big-ring{width:min(86vw,380px,max(220px,calc(100dvh - 330px)))}
+
+.home-task.empty{padding:8px}
+.home-add{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:14px;background:linear-gradient(135deg,#d6f7e8,#8fe3c0);color:#0d2a39;font-weight:800;font-size:15px}
+.peek{position:relative;padding-right:56px}
+.peek-add{position:absolute;right:0;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--primary);color:#fff}

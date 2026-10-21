@@ -878,10 +878,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="home-task empty">
-            <span className="home-task-actions">
-              <button onClick={() => { setShowImport(true); setSheetOpen(true); }}><ClipboardPaste size={15}/> Importa da DidUP</button>
-              <button onClick={openAdd}><Plus size={15}/> Scrivi</button>
-            </span>
+            <button className="home-add" onClick={openAdd}><Plus size={18}/> Aggiungi compiti</button>
           </div>
         )}
         {quotesOn && quote && mode === "idle" && <p className="quote on-dark">{quote}</p>}
@@ -904,6 +901,7 @@ export default function Home() {
             <div className="peek">
               <b>Da fare <span className="count">{open.length}</span></b>
               <span>{nextTask ? `Poi: ${nextTask.title}` : hasTasks ? "Tira su per vedere i compiti" : "Tira su per aggiungere"}</span>
+              <button className="peek-add" onClick={openAdd} aria-label="Aggiungi compiti"><Plus size={20}/></button>
             </div>
           )}
         </div>

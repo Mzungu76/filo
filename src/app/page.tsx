@@ -15,6 +15,7 @@ import GoalsView from "./GoalsView";
 import Medal, { LevelBadge } from "./Medal";
 import { TIER_NAMES, challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
 import { weekStart as weekStartOf } from "@/lib/stats";
+import { CHECK_PATH, THREAD_PATH } from "@/lib/brandPath";
 import { SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
@@ -617,9 +618,9 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <span className="brand"><span className="brand-mark" aria-hidden="true">
-          <svg viewBox="32 64 380 380" width="100%" height="100%">
-            <path d="M70 380C112 442 190 344 256 344A118 118 0 1 0 138 226" fill="none" stroke="#9be3c4" strokeWidth="38" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="138" cy="226" r="26" fill="#ffc857"/>
+          <svg viewBox="76 76 360 360" width="100%" height="100%">
+            <path d={THREAD_PATH} fill="none" stroke="#9be3c4" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d={CHECK_PATH} fill="none" stroke="#ffc857" strokeWidth="46" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </span><span>filo</span></span>
         <span className="top-right">

@@ -291,3 +291,4 @@ h2{font-size:20px;line-height:1.2}
 .keep-item{text-align:left;color:var(--ink)}
 .brand-mark{padding:5px;background:linear-gradient(135deg,#21495f,#0d1f2d)}
 .brand-mark svg{display:block}
+.brand-mark{padding:3px}

@@ -12,6 +12,8 @@ import { computeStats } from "@/lib/stats";
 import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
 import FocusHome from "./FocusHome";
+import SoloHome from "./SoloHome";
+import TimerFace, { STYLE_COUNT, styleVars } from "./TimerFaces";
 import { BigRing, Ring, subjectHue, tap } from "./ui";
 import GoalsView from "./GoalsView";
 import { LevelBadge } from "./LevelBadge";
@@ -29,6 +31,8 @@ type Celebration = { kind: "medal" | "level" | "challenge" | "reward"; title: st
 const DEFAULT_START = "16:30";
 /** Edizione "focus": solo timer e compiti (NEXT_PUBLIC_EDITION=focus al momento della build). */
 const FOCUS = process.env.NEXT_PUBLIC_EDITION === "focus";
+/** Edizione "filò": solo il timer, con un aspetto diverso a ogni blocco. */
+const SOLO = process.env.NEXT_PUBLIC_EDITION === "solo";
 const DAY = 24 * 3600 * 1000;
 
 function uid() {
@@ -120,7 +124,9 @@ export default function Home() {
   const dataRef = useRef<{ sessions: StudySession[]; tasks: Task[] }>({ sessions: [], tasks: [] });
   const syncing = useRef(false);
   const resistedRef = useRef(0);
-  const [quotesOn, setQuotesOn] = useState(true);
+  const [quotesOnRaw, setQuotesOn] = useState(true);
+  const quotesOn = quotesOnRaw && !SOLO;
+  const [styleIdx, setStyleIdx] = useState(0);
   const [quote, setQuote] = useState<string | null>(null);
   const [blockedQuote, setBlockedQuote] = useState("");
   const modeRef = useRef<Mode>("idle");
@@ -254,7 +260,7 @@ export default function Home() {
 
   // Città: sfide della settimana, nuovi edifici, livelli e premio. Tutto derivato dai dati: niente da dichiarare a mano.
   useEffect(() => {
-    if (FOCUS || !ready || !goalsLoaded) return;
+    if (FOCUS || SOLO || !ready || !goalsLoaded) return;
     // Raccoglie le feste di questo giro e ne mostra poche: medaglie migliori, livello, sfide unite, premio.
     const queue: Celebration[] = [];
     const lostNames: string[] = [];
@@ -377,7 +383,7 @@ export default function Home() {
         setMode(r.phase);
         setEndAt(r.endAt);
         // A fine pausa Android fa suonare l'avviso: il silenzioso riparte dopo, non subito.
-        if (r.phase === "work") setTimeout(() => void setSilent(true), 4500);
+        if (r.phase === "work") { setTimeout(() => void setSilent(true), 4500); nextStyle(); }
         else void setSilent(false);
         if (r.phase === "break") {
           setNotice(`Blocco completato. Pausa di ${plan.rest} minuti: alzati e muoviti un po’.`);
@@ -597,11 +603,31 @@ export default function Home() {
     } else if (alertsOn) void askNotificationPermission();
   }
 
+  /** Sceglie il prossimo aspetto del timer: tutti i 69 prima di ripeterne uno. */
+  function nextStyle() {
+    if (!SOLO) return;
+    let bag: number[] = [];
+    try { bag = JSON.parse(localStorage.getItem("filo-style-bag") || "[]"); } catch {}
+    if (!Array.isArray(bag) || bag.length === 0) {
+      bag = Array.from({ length: STYLE_COUNT }, (_, i) => i);
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    }
+    let pick = bag.pop()!;
+    if (pick === styleIdx && bag.length) { const other = bag.pop()!; bag.push(pick); pick = other; }
+    try { localStorage.setItem("filo-style-bag", JSON.stringify(bag)); } catch {}
+    setStyleIdx(pick);
+  }
+  useEffect(() => {
+    if (!SOLO) return;
+    const q = Number(new URLSearchParams(window.location.search).get("s"));
+    setStyleIdx(Number.isFinite(q) && q > 0 ? q % STYLE_COUNT : Math.floor(Math.random() * STYLE_COUNT));
+  }, []);
+
   /** Tocco su Play dalla home: senza compiti chiede conferma con un messaggio amichevole. */
   function onPlay() {
     let skip = skipFreeWarn;
     try { skip = skip || localStorage.getItem("filo-skip-free-warning") === "1"; } catch {}
-    if (mode === "idle" && open.length === 0 && !skip) { setConfirmFree(true); return; }
+    if (mode === "idle" && open.length === 0 && !skip && !SOLO) { setConfirmFree(true); return; }
     startWork();
   }
   function openAdd() {
@@ -632,6 +658,7 @@ export default function Home() {
       subjectMsRef.current = {}; blocksRef.current = 0; distractionsRef.current = 0; resistedRef.current = 0;
     }
     setQuote(pickQuote("start"));
+    nextStyle();
     startBlock(lockedPlan ?? livePlan);
     setNotice("");
   }
@@ -852,8 +879,12 @@ export default function Home() {
   const ringLabel = mode === "idle" ? "Pronto" : timerLabel;
 
   return (
-    <main className={isHome ? (FOCUS ? "app-shell home-mode focus-mode" : "app-shell home-mode") : "app-shell"}>
-            {FOCUS ? (<>
+    <main className={isHome ? (SOLO ? "app-shell home-mode focus-mode solo-mode" : FOCUS ? "app-shell home-mode focus-mode" : "app-shell home-mode") : "app-shell"}>
+            {SOLO ? (
+        <SoloHome styleIdx={styleIdx} mode={mode} shown={shown} ringValue={ringValue} timerLabel={timerLabel} work={plan.work} rest={plan.rest} level={plan.level}
+          choosePreset={choosePreset} onPlay={onPlay} openSession={() => setFocusOpen(true)} formatTime={formatTime}
+          silentMissing={native && !silentOk} grantSilent={() => void openSilentSettings()}/>
+      ) : FOCUS ? (<>
         <FocusHome silentMissing={native && !silentOk} grantSilent={() => void openSilentSettings()} writeOpen={writeOpen} setWriteOpen={setWriteOpen} mode={mode} shown={shown} ringValue={ringValue} timerLabel={timerLabel} planLabel={planLabel} preset={preset} choosePreset={choosePreset}
           onPlay={onPlay} openSession={() => setFocusOpen(true)} open={open} current={current} setFocusId={setFocusId} toggleTask={toggleTask} deleteTask={deleteTask}
           taskInput={taskInput} setTaskInput={setTaskInput} taskDate={taskDate} setTaskDate={setTaskDate} addTask={addTask}
@@ -964,7 +995,7 @@ export default function Home() {
       </>)}
 
       {mode !== "idle" && focusOpen && (
-        <div className={`focus-screen phase-${mode}`} role="dialog" aria-label="Sessione di studio">
+        <div className={`focus-screen phase-${mode}${SOLO ? " solo-screen" : ""}`} style={SOLO ? styleVars(styleIdx) : undefined} role="dialog" aria-label="Sessione di studio">
           <div className="focus-top">
             <button className="icon-btn" onClick={() => setFocusOpen(false)} aria-label="Riduci e torna ai compiti"><ChevronDown size={22}/></button>
             <span className="focus-phase"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
@@ -972,14 +1003,21 @@ export default function Home() {
           </div>
           <div className="focus-body">
             <div className="focus-ring">
-              <BigRing value={ringValue}>
+              {SOLO ? <TimerFace index={styleIdx} value={ringValue}>
+                {mode === "break" && <span className="breath"/>}
+                <div className="big-center">
+                  <span className="big-state"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
+                  <span className="big-time">{formatTime(shown)}</span>
+                  <span className="big-plan">{plan.work} min · pausa {plan.rest}</span>
+                </div>
+              </TimerFace> : <BigRing value={ringValue}>
                 {mode === "break" && <span className="breath"/>}
                 <div className="big-center">
                   <span className="big-state"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
                   <span className="big-time">{formatTime(shown)}</span>
                   <span className="big-plan">{plan.work} min studio · {plan.rest} pausa</span>
                 </div>
-              </BigRing>
+              </BigRing>}
             </div>
             {mode === "break" && <p className="breath-hint">Respira lentamente · alza lo sguardo dallo schermo</p>}
             {current && (
@@ -1011,7 +1049,7 @@ export default function Home() {
         </div>
       )}
 
-      {!FOCUS && <nav className="bottom-nav" aria-label="Navigazione principale">
+      {!FOCUS && !SOLO && <nav className="bottom-nav" aria-label="Navigazione principale">
         <div className="bottom-nav-inner">
           <button className={view === "today" ? "nav-item active" : "nav-item"} onClick={() => setView("today")} aria-current={view === "today" ? "page" : undefined}><HomeIcon size={22}/>Oggi</button>
           <button className={view === "goals" ? "nav-item active" : "nav-item"} onClick={() => setView("goals")} aria-current={view === "goals" ? "page" : undefined}>

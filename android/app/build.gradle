@@ -38,6 +38,12 @@ android {
             applicationIdSuffix ".lite"
             versionNameSuffix "-lite"
         }
+        // "solo": filò, solo il timer (aspetto diverso a ogni blocco) con blocco automatico delle notifiche.
+        solo {
+            dimension "edition"
+            applicationIdSuffix ".solo"
+            versionNameSuffix "-solo"
+        }
         // "focus": app separata e minimale (solo timer e compiti); il suo codice web arriva da src/focus/assets.
         focus {
             dimension "edition"

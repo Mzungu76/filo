@@ -509,3 +509,27 @@ p{text-wrap:pretty}
 .focus-mode .toast{bottom:calc(100px + env(safe-area-inset-bottom))}
 .fh-silent{align-self:stretch;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-radius:18px;background:rgba(243,197,123,.16);border:1px solid rgba(243,197,123,.4);color:#f6d79e;text-align:left;min-height:60px}
 .fh-silent span{display:flex;flex-direction:column;gap:2px}.fh-silent b{font-size:15px;color:#ffe2ad}.fh-silent small{font-size:12px;opacity:.85}
+
+/* ===== filò: solo il timer ===== */
+.solo{--solo-bg:radial-gradient(120% 70% at 50% 30%,#1b5a6e 0%,#0b1f2c 100%);--solo-f1:#e6fbf1;--solo-f2:#6fd3ac;--solo-ink:#fff;--solo-on:#0d2a39;--solo-track:rgba(255,255,255,.13);
+  min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;padding:calc(16px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));background:var(--solo-bg);color:var(--solo-ink);transition:background .5s}
+.solo-ring{position:relative;display:grid;place-items:center;margin-bottom:46px}
+.solo .big-ring,.solo-screen .big-ring{width:min(90vw,420px,calc(100dvh - 300px))}
+.tface svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.tface .big-state,.tface .big-plan{color:inherit;opacity:.75}
+.solo .play-btn,.solo-screen .round-btn{background:linear-gradient(135deg,var(--solo-f1),var(--solo-f2));color:var(--solo-on);box-shadow:0 12px 30px rgba(0,0,0,.28)}
+.solo .play-btn{width:104px;height:104px;bottom:-52px}
+.solo .play-btn.wide{width:auto;height:64px;bottom:-32px;font-size:17px}
+.solo-mins{display:flex;gap:12px}
+.solo-mins button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:84px;min-height:72px;border-radius:22px;border:2px solid color-mix(in srgb,var(--solo-ink) 28%,transparent);color:var(--solo-ink);font:800 26px Manrope,system-ui,sans-serif;line-height:1}
+.solo-mins button small{font:600 12px "DM Sans",sans-serif;opacity:.75;margin-top:4px}
+.solo-mins button.on{background:var(--solo-ink);color:var(--solo-on);border-color:transparent}
+.solo .fh-silent{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
+.solo-screen{background:var(--solo-bg)!important;color:var(--solo-ink)}
+.solo-screen .focus-phase{background:color-mix(in srgb,var(--solo-ink) 14%,transparent);color:var(--solo-ink)}
+.solo-screen .side-btn{color:var(--solo-ink)}
+.solo-screen .side-btn span.ic,.solo-screen .focus-top .icon-btn{background:color-mix(in srgb,var(--solo-ink) 14%,transparent);border-color:color-mix(in srgb,var(--solo-ink) 24%,transparent);color:var(--solo-ink)}
+.solo-screen .focus-ring{width:auto;aspect-ratio:auto}
+.solo-screen .focus-ring .big-ring{width:min(92vw,420px,calc(100dvh - 260px))}
+.solo-screen .focus-ring .big-state{display:inline-flex}
+.solo-mode .toast{bottom:calc(24px + env(safe-area-inset-bottom))}

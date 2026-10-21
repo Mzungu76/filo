@@ -60,6 +60,18 @@ jobs:
           BUILD_TARGET: android
           NEXT_PUBLIC_EDITION: focus
 
+      # Terza app, solo timer ("filò").
+      - name: Build web app (solo edition)
+        run: |
+          rm -rf .next out
+          npm run build
+          mkdir -p android/app/src/solo/assets
+          rm -rf android/app/src/solo/assets/public
+          cp -r out android/app/src/solo/assets/public
+        env:
+          BUILD_TARGET: android
+          NEXT_PUBLIC_EDITION: solo
+
       # Firma stabile: i segreti contengono la chiave (vedi README). Senza segreti si costruisce comunque, con firma di debug.
       - name: Prepare signing key
         env:
@@ -80,7 +92,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$SIGNED" ]; then ./gradlew assembleLiteRelease assembleFocusRelease --no-daemon; else ./gradlew assembleLiteDebug assembleFocusDebug --no-daemon; fi
+          if [ -n "$SIGNED" ]; then ./gradlew assembleLiteRelease assembleFocusRelease assembleSoloRelease --no-daemon; else ./gradlew assembleLiteDebug assembleFocusDebug assembleSoloDebug --no-daemon; fi
 
       # Si pubblica la versione "lite" (senza servizio di accessibilità) come app principale.
       - name: Name the APK
@@ -88,9 +100,11 @@ jobs:
           if [ -n "$SIGNED" ]; then
             cp android/app/build/outputs/apk/lite/release/app-lite-release.apk filo.apk
             cp android/app/build/outputs/apk/focus/release/app-focus-release.apk filo-focus.apk
+            cp android/app/build/outputs/apk/solo/release/app-solo-release.apk filo-solo.apk
           else
             cp android/app/build/outputs/apk/lite/debug/app-lite-debug.apk filo.apk
             cp android/app/build/outputs/apk/focus/debug/app-focus-debug.apk filo-focus.apk
+            cp android/app/build/outputs/apk/solo/debug/app-solo-debug.apk filo-solo.apk
           fi
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -1)
           "$APKSIGNER" verify --print-certs filo.apk | grep -E "certificate (DN|SHA-256)"
@@ -101,6 +115,7 @@ jobs:
           path: |
             filo.apk
             filo-focus.apk
+            filo-solo.apk
 
       - name: Publish to release "android-latest"
         env:
@@ -109,5 +124,5 @@ jobs:
           gh release view android-latest >/dev/null 2>&1 || \
             gh release create android-latest --prerelease --title "Filo per Android" \
               --notes "Ultima versione dell'app Android. Scarica filo.apk e installala sul telefono."
-          gh release upload android-latest filo.apk filo-focus.apk --clobber
+          gh release upload android-latest filo.apk filo-focus.apk filo-solo.apk --clobber
           gh release delete-asset android-latest filo-lite.apk -y || true

@@ -44,9 +44,17 @@ public class FocusReceiver extends BroadcastReceiver {
             // Solo priorità, ma con una regola nostra: passano le chiamate (da chiunque) e le sveglie (i suoni di Filo);
             // messaggi, app e notifiche restano zitti.
             int cats = NotificationManager.Policy.PRIORITY_CATEGORY_CALLS | NotificationManager.Policy.PRIORITY_CATEGORY_ALARMS;
+            // Anche a schermo: niente pop-up, icone, puntini o accensione dello schermo per le notifiche silenziate.
+            int fx = NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_OFF | NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_ON;
+            if (Build.VERSION.SDK_INT >= 28) {
+                fx |= NotificationManager.Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT | NotificationManager.Policy.SUPPRESSED_EFFECT_LIGHTS
+                        | NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK | NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR
+                        | NotificationManager.Policy.SUPPRESSED_EFFECT_BADGE | NotificationManager.Policy.SUPPRESSED_EFFECT_AMBIENT
+                        | NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST;
+            }
             try {
                 nm.setNotificationPolicy(new NotificationManager.Policy(cats, NotificationManager.Policy.PRIORITY_SENDERS_ANY,
-                        NotificationManager.Policy.PRIORITY_SENDERS_ANY, 0));
+                        NotificationManager.Policy.PRIORITY_SENDERS_ANY, fx));
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY);
             } catch (Throwable t) {
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS);

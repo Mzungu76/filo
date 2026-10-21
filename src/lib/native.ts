@@ -8,7 +8,7 @@ type FocusPlugin = {
   setSilent(o: { on: boolean }): Promise<void>;
   schedule(o: { events: NativeEvent[] }): Promise<void>;
   cancel(): Promise<void>;
-  guardStatus(): Promise<{ serviceEnabled: boolean; on: boolean }>;
+  guardStatus(): Promise<{ available: boolean; serviceEnabled: boolean; on: boolean }>;
   openAccessibilitySettings(): Promise<void>;
   openAppInfo(): Promise<void>;
   listApps(): Promise<{ apps: { package: string; label: string }[] }>;
@@ -83,8 +83,8 @@ export const SUGGESTED_BLOCKED = [
 ];
 
 export async function guardStatus() {
-  if (!isNative()) return { serviceEnabled: false, on: false };
-  try { return await Focus.guardStatus(); } catch { return { serviceEnabled: false, on: false }; }
+  if (!isNative()) return { available: false, serviceEnabled: false, on: false };
+  try { return await Focus.guardStatus(); } catch { return { available: false, serviceEnabled: false, on: false }; }
 }
 export async function openAccessibilitySettings() { try { await Focus.openAccessibilitySettings(); } catch {} }
 export async function openAppInfo() { try { await Focus.openAppInfo(); } catch {} }

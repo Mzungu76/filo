@@ -116,6 +116,7 @@ export default function Home() {
   const [guardOn, setGuardOn] = useState(false);
   const [guardApps, setGuardApps] = useState<string[]>([]);
   const [guardService, setGuardService] = useState(false);
+  const [guardAvailable, setGuardAvailable] = useState(false);
   const [installed, setInstalled] = useState<{ package: string; label: string }[]>([]);
   const [showApps, setShowApps] = useState(false);
   const [appSearch, setAppSearch] = useState("");
@@ -194,7 +195,7 @@ export default function Home() {
     if (!native) return;
     const check = () => {
       void hasSilentAccess().then(setSilentOk);
-      void guardStatus().then((g) => setGuardService(g.serviceEnabled));
+      void guardStatus().then((g) => { setGuardService(g.serviceEnabled); setGuardAvailable(g.available); });
     };
     check();
     document.addEventListener("visibilitychange", check);
@@ -900,7 +901,7 @@ export default function Home() {
               <button className={alertsOn ? "toggle on" : "toggle"} onClick={toggleAlerts} type="button" role="switch" aria-checked={alertsOn} aria-label="Suono e notifiche"><span/></button>
             </div>
             )}
-            {native && (
+            {native && guardAvailable && (
               <div className="guard-box">
                 <div className="notification-row">
                   <div>

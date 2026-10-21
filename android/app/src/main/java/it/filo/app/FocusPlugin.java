@@ -105,9 +105,20 @@ public class FocusPlugin extends Plugin {
         return false;
     }
 
+    /** Nella versione "lite" il servizio non è dichiarato nel manifest: il blocco app non è disponibile. */
+    private boolean guardAvailable() {
+        try {
+            getContext().getPackageManager().getServiceInfo(new ComponentName(getContext(), FocusGuardService.class), 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @PluginMethod
     public void guardStatus(PluginCall call) {
         JSObject ret = new JSObject();
+        ret.put("available", guardAvailable());
         ret.put("serviceEnabled", guardServiceEnabled());
         ret.put("on", prefs().getBoolean("guard_on", false));
         call.resolve(ret);

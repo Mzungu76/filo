@@ -68,18 +68,26 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$SIGNED" ]; then ./gradlew assembleRelease --no-daemon; else ./gradlew assembleDebug --no-daemon; fi
+          if [ -n "$SIGNED" ]; then ./gradlew assembleFullRelease assembleLiteRelease --no-daemon; else ./gradlew assembleFullDebug assembleLiteDebug --no-daemon; fi
 
-      - name: Name the APK
+      - name: Name the APKs
         run: |
-          if [ -n "$SIGNED" ]; then cp android/app/build/outputs/apk/release/app-release.apk filo.apk; else cp android/app/build/outputs/apk/debug/app-debug.apk filo.apk; fi
+          if [ -n "$SIGNED" ]; then
+            cp android/app/build/outputs/apk/full/release/app-full-release.apk filo.apk
+            cp android/app/build/outputs/apk/lite/release/app-lite-release.apk filo-lite.apk
+          else
+            cp android/app/build/outputs/apk/full/debug/app-full-debug.apk filo.apk
+            cp android/app/build/outputs/apk/lite/debug/app-lite-debug.apk filo-lite.apk
+          fi
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -1)
-          "$APKSIGNER" verify --print-certs filo.apk | grep -E "certificate (DN|SHA-256)"
+          for f in filo.apk filo-lite.apk; do echo "== $f"; "$APKSIGNER" verify --print-certs "$f" | grep -E "certificate (DN|SHA-256)"; done
 
       - uses: actions/upload-artifact@v4
         with:
           name: filo-apk
-          path: filo.apk
+          path: |
+            filo.apk
+            filo-lite.apk
 
       - name: Publish to release "android-latest"
         env:
@@ -88,4 +96,4 @@ jobs:
           gh release view android-latest >/dev/null 2>&1 || \
             gh release create android-latest --prerelease --title "Filo per Android" \
               --notes "Ultima versione dell'app Android. Scarica filo.apk e installala sul telefono."
-          gh release upload android-latest filo.apk --clobber
+          gh release upload android-latest filo.apk filo-lite.apk --clobber

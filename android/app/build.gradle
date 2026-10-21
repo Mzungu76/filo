@@ -29,6 +29,16 @@ android {
             }
         }
     }
+    // "full": con blocco delle altre app. "lite": senza servizio di accessibilità (installabile accanto alla full).
+    flavorDimensions "edition"
+    productFlavors {
+        full { dimension "edition" }
+        lite {
+            dimension "edition"
+            applicationIdSuffix ".lite"
+            versionNameSuffix "-lite"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false

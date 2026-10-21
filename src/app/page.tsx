@@ -616,7 +616,12 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <span className="brand"><span className="brand-mark">f</span><span>filo</span></span>
+        <span className="brand"><span className="brand-mark" aria-hidden="true">
+          <svg viewBox="32 64 380 380" width="100%" height="100%">
+            <path d="M70 380C112 442 190 344 256 344A118 118 0 1 0 138 226" fill="none" stroke="#9be3c4" strokeWidth="38" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="138" cy="226" r="26" fill="#ffc857"/>
+          </svg>
+        </span><span>filo</span></span>
         <span className="top-right">
           <button className="icon-btn" aria-label={view === "goals" ? "Torna ai compiti" : "Traguardi"} onClick={() => setView(view === "goals" ? "today" : "goals")}>
             {view === "goals" ? <ArrowLeft size={18}/> : <Trophy size={18}/>}

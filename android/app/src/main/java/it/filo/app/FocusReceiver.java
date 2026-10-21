@@ -30,9 +30,11 @@ public class FocusReceiver extends BroadcastReceiver {
 
     /** Attiva (true) o ripristina (false) il non disturbare. Ricorda lo stato precedente dell'utente. */
     static void applySilent(Context ctx, boolean on) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        // Anche il blocco delle altre app segue lo stato "concentrazione"; scade da solo (vedi FocusGuardService).
+        prefs.edit().putBoolean("focus_on", on).putLong("focus_set_at", System.currentTimeMillis()).apply();
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null || !nm.isNotificationPolicyAccessGranted()) return;
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (on) {
             if (!prefs.getBoolean("active", false)) {
                 prefs.edit().putBoolean("active", true).putInt("previous", nm.getCurrentInterruptionFilter()).apply();

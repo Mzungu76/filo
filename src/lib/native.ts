@@ -8,6 +8,13 @@ type FocusPlugin = {
   setSilent(o: { on: boolean }): Promise<void>;
   schedule(o: { events: NativeEvent[] }): Promise<void>;
   cancel(): Promise<void>;
+  guardStatus(): Promise<{ serviceEnabled: boolean; on: boolean }>;
+  openAccessibilitySettings(): Promise<void>;
+  openAppInfo(): Promise<void>;
+  listApps(): Promise<{ apps: { package: string; label: string }[] }>;
+  setGuard(o: { on: boolean; apps: string[] }): Promise<void>;
+  snooze(o: { minutes: number }): Promise<void>;
+  consumeBlocked(): Promise<{ label?: string }>;
 };
 
 const Focus = registerPlugin<FocusPlugin>("Focus");
@@ -63,4 +70,38 @@ export async function scheduleNative(phase: "work" | "break", endAt: number, wor
 export async function pickAndReadImage(): Promise<string | null> {
   const r = await Ocr.pickAndRead();
   return r.cancelled ? null : r.text;
+}
+
+// ---- Blocco distrazioni ----
+
+/** App tipiche di distrazione: preselezionate se installate. */
+export const SUGGESTED_BLOCKED = [
+  "com.whatsapp", "com.whatsapp.w4b", "com.instagram.android", "com.zhiliaoapp.musically", "com.ss.android.ugc.trill",
+  "com.google.android.youtube", "com.snapchat.android", "org.telegram.messenger", "com.discord",
+  "com.facebook.katana", "com.facebook.orca", "com.twitter.android", "tv.twitch.android.app",
+  "com.reddit.frontpage", "com.pinterest", "com.netflix.mediaclient", "com.instagram.barcelona"
+];
+
+export async function guardStatus() {
+  if (!isNative()) return { serviceEnabled: false, on: false };
+  try { return await Focus.guardStatus(); } catch { return { serviceEnabled: false, on: false }; }
+}
+export async function openAccessibilitySettings() { try { await Focus.openAccessibilitySettings(); } catch {} }
+export async function openAppInfo() { try { await Focus.openAppInfo(); } catch {} }
+export async function listApps() {
+  if (!isNative()) return [];
+  try { return (await Focus.listApps()).apps; } catch { return []; }
+}
+export async function setGuard(on: boolean, apps: string[]) {
+  if (!isNative()) return;
+  try { await Focus.setGuard({ on, apps }); } catch {}
+}
+export async function snoozeGuard(minutes: number) {
+  if (!isNative()) return;
+  try { await Focus.snooze({ minutes }); } catch {}
+}
+/** Nome dell'app bloccata più di recente (e la dimentica), oppure null. */
+export async function consumeBlocked(): Promise<string | null> {
+  if (!isNative()) return null;
+  try { return (await Focus.consumeBlocked()).label ?? null; } catch { return null; }
 }

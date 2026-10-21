@@ -8,7 +8,7 @@ import { readImageText } from "@/lib/ocr";
 import { askNotificationPermission, chime, keepAwake, notificationsSupported, notify, unlockAudio, vibrate } from "@/lib/alerts";
 import { useInstall } from "@/lib/install";
 import { advance as stepTimer } from "@/lib/timer";
-import { askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
+import { SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
@@ -82,6 +82,13 @@ export default function Home() {
   const install = useInstall();
   const [native, setNative] = useState(false);
   const [silentOk, setSilentOk] = useState(false);
+  const [guardOn, setGuardOn] = useState(false);
+  const [guardApps, setGuardApps] = useState<string[]>([]);
+  const [guardService, setGuardService] = useState(false);
+  const [installed, setInstalled] = useState<{ package: string; label: string }[]>([]);
+  const [showApps, setShowApps] = useState(false);
+  const [appSearch, setAppSearch] = useState("");
+  const [blockedApp, setBlockedApp] = useState<string | null>(null);
   const lastTickRef = useRef(0);
   const alertRef = useRef<(title: string, body: string, kind: "start" | "rest") => void>(() => {});
   const remindedRef = useRef("");
@@ -97,6 +104,10 @@ export default function Home() {
       getSetting("alerts", true), getSetting("startTime", DEFAULT_START)
     ]);
     setPreset(savedPreset);
+    const [gOn, gApps] = await Promise.all([getSetting("guardOn", false), getSetting<string[]>("guardApps", [])]);
+    setGuardOn(gOn);
+    setGuardApps(gApps);
+    void setGuard(gOn, gApps);
     setAlertsOn(savedAlerts);
     setStartTime(savedStart);
     setTasks(nextTasks);
@@ -139,11 +150,24 @@ export default function Home() {
   // Silenzioso: controlla (e ricontrolla al ritorno nell'app) il permesso "Non disturbare".
   useEffect(() => {
     if (!native) return;
-    const check = () => { void hasSilentAccess().then(setSilentOk); };
+    const check = () => {
+      void hasSilentAccess().then(setSilentOk);
+      void guardStatus().then((g) => setGuardService(g.serviceEnabled));
+    };
     check();
     document.addEventListener("visibilitychange", check);
     return () => document.removeEventListener("visibilitychange", check);
   }, [native]);
+
+  // Se un'app bloccata è stata aperta, il servizio ci ha riportato qui: mostra il promemoria.
+  useEffect(() => {
+    if (!native || !guardOn) return;
+    const look = () => { void consumeBlocked().then((label) => { if (label) setBlockedApp(label); }); };
+    look();
+    const id = setInterval(look, 1500);
+    document.addEventListener("visibilitychange", look);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", look); };
+  }, [native, guardOn]);
 
   useEffect(() => {
     if ((mode !== "work" && mode !== "break") || !endAt) return;
@@ -252,6 +276,35 @@ export default function Home() {
     } finally {
       setReading(null);
     }
+  }
+
+  async function saveGuard(on: boolean, apps: string[]) {
+    setGuardOn(on);
+    setGuardApps(apps);
+    await Promise.all([setSetting("guardOn", on), setSetting("guardApps", apps)]);
+    await setGuard(on, apps);
+  }
+
+  async function openAppPicker() {
+    const apps = (await listApps()).sort((a, b) => a.label.localeCompare(b.label, "it"));
+    setInstalled(apps);
+    // Prima volta: preseleziona le app di distrazione più comuni tra quelle installate.
+    if (guardApps.length === 0) {
+      const preset = apps.filter((a) => SUGGESTED_BLOCKED.includes(a.package)).map((a) => a.package);
+      if (preset.length) await saveGuard(guardOn, preset);
+    }
+    setAppSearch("");
+    setShowApps(true);
+  }
+
+  async function toggleGuardApp(pkg: string) {
+    await saveGuard(guardOn, guardApps.includes(pkg) ? guardApps.filter((p) => p !== pkg) : [...guardApps, pkg]);
+  }
+
+  async function needTwoMinutes() {
+    await snoozeGuard(2);
+    setBlockedApp(null);
+    setNotice("Hai 2 minuti: poi si torna al compito.");
   }
 
   async function toggleAlerts() {
@@ -529,6 +582,41 @@ export default function Home() {
       </section>
       <p className="privacy-note">I tuoi dati restano su questo dispositivo. Nessun account.</p>
 
+      {blockedApp && mode === "work" && (
+        <div className="modal-backdrop" role="presentation" style={{ zIndex: 30 }}>
+          <section className="settings-modal blocked-card" role="alertdialog" aria-labelledby="blocked-title">
+            <p className="eyebrow">BLOCCO DI STUDIO</p>
+            <h2 id="blocked-title">{blockedApp} aspetta la pausa.</h2>
+            <p className="subhead">Mancano {formatTime(remaining)}. Un compito alla volta: {current ? `“${current.title}”` : "resta su Filo"}.</p>
+            <button className="primary-btn dark full-btn" onClick={() => setBlockedApp(null)}>Resto sul compito</button>
+            <button className="danger-link" onClick={() => void needTwoMinutes()}>Mi servono 2 minuti</button>
+          </section>
+        </div>
+      )}
+
+      {showApps && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowApps(false); }}>
+          <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="apps-title">
+            <div className="modal-head">
+              <div><p className="eyebrow">DISTRAZIONI</p><h2 id="apps-title">Quali app blocchiamo?</h2></div>
+              <button className="icon-btn" onClick={() => setShowApps(false)} aria-label="Chiudi"><X size={18}/></button>
+            </div>
+            <input className="app-search" value={appSearch} onChange={(e) => setAppSearch(e.target.value)} placeholder="Cerca un’app…" aria-label="Cerca un’app"/>
+            <div className="app-list">
+              {installed
+                .filter((a) => a.label.toLowerCase().includes(appSearch.trim().toLowerCase()))
+                .map((a) => (
+                  <label className="preview-row" key={a.package}>
+                    <input type="checkbox" checked={guardApps.includes(a.package)} onChange={() => void toggleGuardApp(a.package)}/>
+                    <span><strong>{a.label}</strong></span>
+                  </label>
+                ))}
+            </div>
+            <button className="primary-btn dark full-btn" onClick={() => setShowApps(false)}>Fatto ({guardApps.length} app)</button>
+          </section>
+        </div>
+      )}
+
       {showSettings && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowSettings(false); }}>
           <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -558,6 +646,30 @@ export default function Home() {
               <div><strong>Suono e notifiche</strong><span>Avvisi a fine blocco, fine pausa e all’orario di inizio.</span></div>
               <button className={alertsOn ? "toggle on" : "toggle"} onClick={toggleAlerts} type="button" role="switch" aria-checked={alertsOn} aria-label="Suono e notifiche"><span/></button>
             </div>
+            )}
+            {native && (
+              <div className="guard-box">
+                <div className="notification-row">
+                  <div>
+                    <strong>Blocca le distrazioni</strong>
+                    <span>Durante i blocchi di studio, se apri una delle app che scegli (social, messaggi, video) torni a Filo. Nelle pause sono libere.</span>
+                  </div>
+                  <button className={guardOn ? "toggle on" : "toggle"} role="switch" aria-checked={guardOn} aria-label="Blocca le distrazioni" type="button"
+                    disabled={!guardService} onClick={() => void saveGuard(!guardOn, guardApps)}><span/></button>
+                </div>
+                {!guardService ? (
+                  <div className="guard-help">
+                    <p><strong>Prima serve un permesso.</strong> In Android: Impostazioni → Accessibilità → Filo → Attiva. Il servizio vede solo il nome dell’app aperta, non legge messaggi né schermo.</p>
+                    <p>Se l’interruttore è grigio: “Info app” di Filo → menu ⋮ → <em>Consenti impostazioni con restrizioni</em>, poi riprova.</p>
+                    <div className="advance-actions">
+                      <button className="install-go" onClick={() => void openAccessibilitySettings()}>Apri Accessibilità</button>
+                      <button className="secondary-light" onClick={() => void openAppInfo()}>Info app</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="secondary-light" onClick={() => void openAppPicker()}>Scegli le app da bloccare ({guardApps.length})</button>
+                )}
+              </div>
             )}
             <label className="field-label">Orario di inizio compiti
               <input type="time" value={startTime} onChange={(e) => changeStartTime(e.target.value)}/>

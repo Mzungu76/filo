@@ -147,3 +147,12 @@ h2{font-size:20px;line-height:1.2}
 .date-row .chip{display:inline-flex;width:auto;border:1px solid var(--line);background:var(--white);color:var(--ink);border-radius:99px;padding:7px 12px;font-size:12px;font-weight:600}
 .date-row .chip.on{background:var(--ink);border-color:var(--ink);color:white}
 .date-row input[type=date]{border:1px solid var(--line);border-radius:10px;background:var(--white);color:var(--ink);padding:6px 9px;font-size:12px;min-width:0}
+.guard-box{margin:6px 0 14px}
+.guard-box .secondary-light{margin:10px 0 0}
+.guard-help{font-size:12px;line-height:1.5;color:var(--ink-soft)}
+.guard-help p{margin:8px 0}
+.toggle:disabled{opacity:.45}
+.app-search{width:100%;margin-bottom:10px;border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px;background:white;color:var(--ink)}
+.app-list{display:flex;flex-direction:column;gap:6px;max-height:48vh;overflow:auto;margin-bottom:14px}
+.blocked-card{text-align:center}
+.blocked-card .subhead{margin:10px 0 18px}

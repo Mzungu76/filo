@@ -150,7 +150,9 @@ export default function Home() {
       if (r.crossed > 0) {
         setMode(r.phase);
         setEndAt(r.endAt);
-        void setSilent(r.phase === "work");
+        // A fine pausa Android fa suonare l'avviso: il silenzioso riparte dopo, non subito.
+        if (r.phase === "work") setTimeout(() => void setSilent(true), 4500);
+        else void setSilent(false);
         if (r.phase === "break") {
           setNotice(`Blocco completato. Pausa di ${plan.rest} minuti: alzati e muoviti un po’.`);
           alertRef.current("Blocco completato", `Pausa di ${plan.rest} minuti.`, "rest");

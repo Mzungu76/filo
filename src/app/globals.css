@@ -141,3 +141,9 @@ h2{font-size:20px;line-height:1.2}
 .silent-tips{margin:14px 0;font-size:12px;line-height:1.5;color:var(--ink-soft)}
 .silent-tips summary{font-weight:700;color:var(--ink);cursor:pointer}
 .silent-tips p{margin:8px 0}
+.task-form{flex-wrap:wrap}
+.date-row{flex:1 0 100%;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--ink-soft)}
+.date-row>span{font-weight:700;margin-right:2px}
+.date-row .chip{display:inline-flex;width:auto;border:1px solid var(--line);background:var(--white);color:var(--ink);border-radius:99px;padding:7px 12px;font-size:12px;font-weight:600}
+.date-row .chip.on{background:var(--ink);border-color:var(--ink);color:white}
+.date-row input[type=date]{border:1px solid var(--line);border-radius:10px;background:var(--white);color:var(--ink);padding:6px 9px;font-size:12px;min-width:0}

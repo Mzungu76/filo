@@ -46,6 +46,12 @@ function dueLabel(due: number | undefined, now: number) {
   if (diff === 1) return `Per domani · ${date}`;
   return `Per ${date}`;
 }
+/** Data locale in formato AAAA-MM-GG, a `offset` giorni da oggi (per il selettore di data). */
+function dayKey(offset: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 function byDue(a: Task, b: Task) {
   return (a.dueDate ?? Infinity) - (b.dueDate ?? Infinity) || a.createdAt - b.createdAt;
 }
@@ -55,6 +61,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [taskInput, setTaskInput] = useState("");
+  const [taskDate, setTaskDate] = useState(""); // AAAA-MM-GG, vuoto = senza scadenza
   const [mode, setMode] = useState<Mode>("idle");
   const [remaining, setRemaining] = useState(0);
   const [preset, setPreset] = useState<Preset>("auto");
@@ -199,7 +206,9 @@ export default function Home() {
     e.preventDefault();
     const title = taskInput.trim();
     if (!title) return;
-    await saveTask({ id: uid(), title, status: "todo", createdAt: Date.now() });
+    const [y, m, d] = taskDate ? taskDate.split("-").map(Number) : [];
+    const dueDate = taskDate ? new Date(y, m - 1, d).getTime() : undefined;
+    await saveTask({ id: uid(), title, status: "todo", createdAt: Date.now(), dueDate });
     setTaskInput("");
     await refresh();
   }
@@ -469,6 +478,13 @@ export default function Home() {
         <form className="task-form" onSubmit={addTask}>
           <input value={taskInput} onChange={(e) => setTaskInput(e.target.value)} placeholder="Aggiungi un compito…" aria-label="Nuovo compito" maxLength={200}/>
           <button type="submit" aria-label="Aggiungi compito" disabled={!taskInput.trim()}><Plus size={19}/></button>
+          <div className="date-row">
+            <span>Per quando?</span>
+            <button type="button" className={taskDate === dayKey(0) ? "chip on" : "chip"} onClick={() => setTaskDate(dayKey(0))}>Oggi</button>
+            <button type="button" className={taskDate === dayKey(1) ? "chip on" : "chip"} onClick={() => setTaskDate(dayKey(1))}>Domani</button>
+            <input type="date" value={taskDate} min={dayKey(0)} onChange={(e) => setTaskDate(e.target.value)} aria-label="Data di consegna"/>
+            {taskDate && <button type="button" className="chip" onClick={() => setTaskDate("")}>Nessuna data</button>}
+          </div>
         </form>
 
         {open.length === 0 ? (

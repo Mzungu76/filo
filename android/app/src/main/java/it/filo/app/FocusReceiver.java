@@ -38,7 +38,7 @@ public class FocusReceiver extends BroadcastReceiver {
             if (!prefs.getBoolean("active", false)) {
                 prefs.edit().putBoolean("active", true).putInt("previous", nm.getCurrentInterruptionFilter()).apply();
             }
-            nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY);
+            nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS);
         } else if (prefs.getBoolean("active", false)) {
             int previous = prefs.getInt("previous", NotificationManager.INTERRUPTION_FILTER_ALL);
             nm.setInterruptionFilter(previous == NotificationManager.INTERRUPTION_FILTER_UNKNOWN

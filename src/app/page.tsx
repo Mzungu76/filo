@@ -854,7 +854,7 @@ export default function Home() {
   return (
     <main className={isHome ? (FOCUS ? "app-shell home-mode focus-mode" : "app-shell home-mode") : "app-shell"}>
             {FOCUS ? (<>
-        <FocusHome writeOpen={writeOpen} setWriteOpen={setWriteOpen} mode={mode} shown={shown} ringValue={ringValue} timerLabel={timerLabel} planLabel={planLabel} preset={preset} choosePreset={choosePreset}
+        <FocusHome silentMissing={native && !silentOk} grantSilent={() => void openSilentSettings()} writeOpen={writeOpen} setWriteOpen={setWriteOpen} mode={mode} shown={shown} ringValue={ringValue} timerLabel={timerLabel} planLabel={planLabel} preset={preset} choosePreset={choosePreset}
           onPlay={onPlay} openSession={() => setFocusOpen(true)} open={open} current={current} setFocusId={setFocusId} toggleTask={toggleTask} deleteTask={deleteTask}
           taskInput={taskInput} setTaskInput={setTaskInput} taskDate={taskDate} setTaskDate={setTaskDate} addTask={addTask}
           native={native} reading={reading} importImage={importImage} importText={importText} setImportText={setImportText} preview={preview} skipped={skipped} setSkipped={setSkipped} toAdd={toAdd.length} importTasks={importTasks} pasteFromClipboard={pasteFromClipboard}

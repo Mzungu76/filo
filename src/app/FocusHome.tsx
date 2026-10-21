@@ -8,6 +8,7 @@ import { LEVELS, type Preset } from "@/lib/workload";
 import { BigRing } from "./ui";
 
 type Props = {
+  silentMissing: boolean; grantSilent: () => void;
   writeOpen: boolean; setWriteOpen: (v: boolean) => void;
   mode: string; shown: number; ringValue: number; timerLabel: string; planLabel: string;
   preset: Preset; choosePreset: (p: Preset) => void | Promise<void>;
@@ -61,6 +62,13 @@ export default function FocusHome(p: Props) {
             <button key={k} className={p.preset === k ? "hp on" : "hp"} onClick={() => void p.choosePreset(k)}>{k === "auto" ? "Auto" : LEVELS[k].label}</button>
           ))}
         </div>
+      )}
+
+      {p.silentMissing && (
+        <button className="fh-silent" onClick={p.grantSilent}>
+          <span><b>Attiva il silenzioso automatico</b><small>Un tocco: poi scegli Filo Focus e attiva “Consenti”</small></span>
+          <ChevronRight size={20}/>
+        </button>
       )}
 
       <div className="fh-now">

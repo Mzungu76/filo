@@ -7,6 +7,8 @@ import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
 import { askNotificationPermission, chime, keepAwake, notificationsSupported, notify, unlockAudio, vibrate } from "@/lib/alerts";
 import { useInstall } from "@/lib/install";
+import { advance as stepTimer } from "@/lib/timer";
+import { askNativeNotifications, cancelNative, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
@@ -71,6 +73,9 @@ export default function Home() {
   const [startTime, setStartTime] = useState(DEFAULT_START);
   const [advance, setAdvance] = useState<Task | null>(null);
   const install = useInstall();
+  const [native, setNative] = useState(false);
+  const [silentOk, setSilentOk] = useState(false);
+  const lastTickRef = useRef(0);
   const alertRef = useRef<(title: string, body: string, kind: "start" | "rest") => void>(() => {});
   const remindedRef = useRef("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -94,12 +99,14 @@ export default function Home() {
 
   useEffect(() => {
     refresh().catch(() => setReady(true));
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+    setNative(isNative());
+    if ("serviceWorker" in navigator && !isNative()) navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, [refresh]);
 
   // Suono e vibrazione sempre; notifica solo se l'app non è in primo piano.
   alertRef.current = (title, body, kind) => {
-    if (!alertsOn) return;
+    // Nell'app Android gli avvisi li gestisce il sistema (suonano anche a schermo spento).
+    if (!alertsOn || isNative()) return;
     chime(kind);
     vibrate();
     if (document.hidden) void notify(title, body);
@@ -122,31 +129,43 @@ export default function Home() {
     return () => clearInterval(id);
   }, [startTime, mode, open]);
 
+  // Silenzioso: controlla (e ricontrolla al ritorno nell'app) il permesso "Non disturbare".
   useEffect(() => {
-    if (mode !== "work" && mode !== "break") return;
-    timerRef.current = setInterval(() => {
-      if (!endAt) return;
-      const seconds = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
-      setRemaining(seconds);
-      if (mode === "work") setWorkSeconds((v) => v + 1);
-      if (seconds <= 0) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = null;
-        if (mode === "work") {
-          setMode("break");
-          setRemaining(plan.rest * 60);
-          setEndAt(Date.now() + plan.rest * 60 * 1000);
+    if (!native) return;
+    const check = () => { void hasSilentAccess().then(setSilentOk); };
+    check();
+    document.addEventListener("visibilitychange", check);
+    return () => document.removeEventListener("visibilitychange", check);
+  }, [native]);
+
+  useEffect(() => {
+    if ((mode !== "work" && mode !== "break") || !endAt) return;
+    const tick = () => {
+      const t = Date.now();
+      // Se l'app è rimasta sospesa, recupera tutte le fasi trascorse (blocco → pausa → blocco…).
+      const r = stepTimer(mode, endAt, lastTickRef.current, t, plan);
+      lastTickRef.current = t;
+      if (r.workMs > 0) setWorkSeconds((v) => v + r.workMs / 1000);
+      setRemaining(Math.max(0, Math.ceil((r.endAt - t) / 1000)));
+      if (r.crossed > 0) {
+        setMode(r.phase);
+        setEndAt(r.endAt);
+        void setSilent(r.phase === "work");
+        if (r.phase === "break") {
           setNotice(`Blocco completato. Pausa di ${plan.rest} minuti: alzati e muoviti un po’.`);
           alertRef.current("Blocco completato", `Pausa di ${plan.rest} minuti.`, "rest");
         } else {
-          setMode("paused");
-          setEndAt(null);
-          setNotice("Pausa finita. Quando vuoi, riparti.");
-          alertRef.current("Pausa finita", "Quando sei pronto, riparti.", "start");
+          setNotice("Pausa finita: si riparte. Un compito alla volta.");
+          alertRef.current("Pausa finita", "Si riparte: un compito alla volta.", "start");
         }
       }
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    };
+    timerRef.current = setInterval(tick, 1000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [mode, endAt, plan]);
 
   const now = Date.now();
@@ -254,7 +273,13 @@ export default function Home() {
 
   function prepareAlerts() {
     unlockAudio();
-    if (alertsOn) void askNotificationPermission();
+    if (isNative()) {
+      void askNativeNotifications();
+      void hasSilentAccess().then((ok) => {
+        setSilentOk(ok);
+        if (!ok) setNotice("Per il silenzioso automatico concedi l’accesso “Non disturbare” dalle impostazioni (icona in alto).");
+      });
+    } else if (alertsOn) void askNotificationPermission();
   }
 
   function startWork() {
@@ -266,23 +291,35 @@ export default function Home() {
     setNotice("");
   }
   function startBlock(p: Plan) {
+    const t = Date.now();
+    const end = t + p.work * 60000;
+    lastTickRef.current = t;
     setMode("work");
     setRemaining(p.work * 60);
-    setEndAt(Date.now() + p.work * 60 * 1000);
+    setEndAt(end);
     setNotice("");
+    void setSilent(true);
+    void scheduleNative("work", end, p.work, p.rest);
   }
   function resumeWork() { unlockAudio(); startBlock(plan); }
   function pauseTimer() {
     setMode("paused");
     setEndAt(null);
     setNotice("Timer in pausa. Puoi riprendere quando sei pronto.");
+    void setSilent(false);
+    void cancelNative();
   }
   function startBreak() {
     unlockAudio();
+    const t = Date.now();
+    const end = t + plan.rest * 60000;
+    lastTickRef.current = t;
     setMode("break");
     setRemaining(plan.rest * 60);
-    setEndAt(Date.now() + plan.rest * 60 * 1000);
+    setEndAt(end);
     setNotice("");
+    void setSilent(false);
+    void scheduleNative("break", end, plan.work, plan.rest);
   }
 
   async function finishSession() {
@@ -296,6 +333,8 @@ export default function Home() {
     }
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
+    void setSilent(false);
+    void cancelNative();
     setMode("idle"); setEndAt(null); setSessionStart(null); setWorkSeconds(0);
     setLockedPlan(null);
     const tomorrow = startOfDay(end) + DAY;
@@ -320,7 +359,7 @@ export default function Home() {
         </span>
       </header>
 
-      {install.visible && (
+      {install.visible && !native && (
         <div className="install-banner" role="note">
           <Download size={18}/>
           <span>
@@ -482,20 +521,27 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {native ? (
+              <div className="notification-row">
+                <div><strong>Silenzioso automatico</strong><span>{silentOk ? "Attivo: parte con il timer e si toglie in pausa." : "Serve il tuo consenso una volta sola (accesso “Non disturbare”)."}</span></div>
+                {!silentOk && <button className="install-go" onClick={() => void openSilentSettings()}>Concedi</button>}
+              </div>
+            ) : (
             <div className="notification-row">
               <div><strong>Suono e notifiche</strong><span>Avvisi a fine blocco, fine pausa e all’orario di inizio.</span></div>
               <button className={alertsOn ? "toggle on" : "toggle"} onClick={toggleAlerts} type="button" role="switch" aria-checked={alertsOn} aria-label="Suono e notifiche"><span/></button>
             </div>
+            )}
             <label className="field-label">Orario di inizio compiti
               <input type="time" value={startTime} onChange={(e) => changeStartTime(e.target.value)}/>
             </label>
-            <details className="silent-tips">
+            {!native && <details className="silent-tips">
               <summary>Come attivare il silenzioso mentre studi</summary>
               <p>Un’app web non può cambiare le impostazioni audio del telefono: si fa una volta sola dal telefono, e poi è automatico.</p>
               <p><strong>iPhone:</strong> app Comandi → Automazione → “Quando apro un’app” → Filo → “Imposta Focus” → Non disturbare (e “Quando chiudo” per disattivarlo).</p>
               <p><strong>Android:</strong> Impostazioni → Benessere digitale (o “Modalità”) → Modalità concentrazione/Non disturbare → scegli Filo come app da pianificare o attiva la modalità quando inizi.</p>
               {!notificationsSupported() && <p>Questo browser non supporta le notifiche: resteranno suono e vibrazione.</p>}
-            </details>
+            </details>}
             <p className="field-help">Il programma automatico considera i compiti per oggi e domani, quante materie sono e quanto lavoro richiede ciascuna. Il timer in corso non cambia durata a metà sessione.</p>
           </section>
         </div>

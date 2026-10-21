@@ -1,0 +1,8 @@
+{
+  "appId": "it.filo.app",
+  "appName": "Filo",
+  "webDir": "out",
+  "android": {
+    "allowMixedContent": false
+  }
+}

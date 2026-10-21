@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Filo</string>
+    <string name="title_activity_main">Filo</string>
+    <string name="package_name">it.filo.app</string>
+    <string name="custom_url_scheme">it.filo.app</string>
+</resources>

@@ -8,7 +8,7 @@ import { readImageText } from "@/lib/ocr";
 import { askNotificationPermission, chime, keepAwake, notificationsSupported, notify, unlockAudio, vibrate } from "@/lib/alerts";
 import { useInstall } from "@/lib/install";
 import { advance as stepTimer } from "@/lib/timer";
-import { askNativeNotifications, cancelNative, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
+import { askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
@@ -223,18 +223,21 @@ export default function Home() {
     }
   }
 
-  async function importImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setReading(0);
+  async function importImage(e?: React.ChangeEvent<HTMLInputElement>) {
+    const file = e?.target.files?.[0];
+    if (e) e.target.value = "";
+    if (!file && !native) return;
+    setReading(native ? -1 : 0);
     try {
-      const text = await readImageText(file, setReading);
+      // Su Android si usa il riconoscimento del sistema; nel browser Tesseract.
+      const text = native ? await pickAndReadImage() : await readImageText(file!, setReading);
+      if (text === null) return;
       setImportText(text);
       setSkipped([]);
-      if (parseDidup(text).length === 0) setNotice("Non ho trovato compiti nell'immagine. Prova con uno screenshot più nitido.");
-    } catch {
-      setNotice("Non sono riuscito a leggere l'immagine. Riprova, oppure incolla il testo.");
+      if (parseDidup(text).length === 0) setNotice("Non ho trovato compiti nell'immagine: controlla il testo qui sotto o prova con uno screenshot più nitido.");
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      setNotice(`Non sono riuscito a leggere l'immagine (${reason}). Riprova, oppure incolla il testo.`);
     } finally {
       setReading(null);
     }
@@ -424,10 +427,16 @@ export default function Home() {
         {showImport && (
           <div className="import-box">
             <p className="field-help">In DidUP apri Diario → Compiti e fai uno screenshot: caricalo qui. In alternativa, copia il testo e incollalo.</p>
-            <label className={`secondary-light upload ${reading !== null ? "busy" : ""}`}>
-              <ImageUp size={15}/> {reading === null ? "Carica screenshot" : `Leggo l’immagine… ${Math.round(reading * 100)}%`}
-              <input type="file" accept="image/*" onChange={importImage} disabled={reading !== null} hidden/>
-            </label>
+            {native ? (
+              <button className={`secondary-light upload ${reading !== null ? "busy" : ""}`} onClick={() => void importImage()} disabled={reading !== null}>
+                <ImageUp size={15}/> {reading === null ? "Carica screenshot" : "Leggo l’immagine…"}
+              </button>
+            ) : (
+              <label className={`secondary-light upload ${reading !== null ? "busy" : ""}`}>
+                <ImageUp size={15}/> {reading === null ? "Carica screenshot" : `Leggo l’immagine… ${Math.round(reading * 100)}%`}
+                <input type="file" accept="image/*" onChange={importImage} disabled={reading !== null} hidden/>
+              </label>
+            )}
             <textarea
               value={importText}
               onChange={(e) => { setImportText(e.target.value); setSkipped([]); }}

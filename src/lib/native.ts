@@ -11,6 +11,7 @@ type FocusPlugin = {
 };
 
 const Focus = registerPlugin<FocusPlugin>("Focus");
+const Ocr = registerPlugin<{ pickAndRead(): Promise<{ cancelled: boolean; text: string }> }>("Ocr");
 
 /** true solo dentro l'app Android (APK): nel browser tutto questo è disattivato. */
 export const isNative = () => Capacitor.isNativePlatform();
@@ -56,4 +57,10 @@ export async function scheduleNative(phase: "work" | "break", endAt: number, wor
     }
   }
   try { await Focus.schedule({ events }); } catch {}
+}
+
+/** Android: sceglie uno screenshot e ne legge il testo con il riconoscimento del sistema. null se annullato. */
+export async function pickAndReadImage(): Promise<string | null> {
+  const r = await Ocr.pickAndRead();
+  return r.cancelled ? null : r.text;
 }

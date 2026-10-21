@@ -8,9 +8,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.AudioAttributes;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.Uri;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -69,16 +68,15 @@ public class FocusReceiver extends BroadcastReceiver {
                 .build();
     }
 
-    private static void playTone(Context ctx) {
+    /** Suona uno dei due suoni di Filo (inizio attività / inizio pausa) con le caratteristiche di una sveglia. */
+    private static void playSound(Context ctx, int rawRes) {
         try {
-            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-            final Ringtone ringtone = RingtoneManager.getRingtone(ctx, uri);
-            if (ringtone == null) return;
-            ringtone.setAudioAttributes(alarmAttributes());
-            ringtone.play();
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override public void run() { ringtone.stop(); }
-            }, 3500);
+            MediaPlayer player = MediaPlayer.create(ctx, rawRes, alarmAttributes(), AudioManager.AUDIO_SESSION_ID_GENERATE);
+            if (player == null) return;
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override public void onCompletion(MediaPlayer mp) { mp.release(); }
+            });
+            player.start();
         } catch (Exception ignored) { }
     }
 
@@ -107,7 +105,8 @@ public class FocusReceiver extends BroadcastReceiver {
         // Fine blocco: si toglie il silenzioso (il cambio è asincrono, ma il suono "da sveglia" non ne dipende).
         if (silent == 0) applySilent(ctx, false);
 
-        playTone(ctx);
+        // silent == 0: finisce il blocco, inizia la pausa. Altrimenti inizia un'attività.
+        playSound(ctx, silent == 0 ? R.raw.sound_break : R.raw.sound_focus);
         buzz(ctx);
 
         ensureChannel(ctx);

@@ -671,6 +671,13 @@ export default function Home() {
                 )}
               </div>
             )}
+            <div className="sound-test">
+              <strong>Suoni</strong>
+              <div className="advance-actions">
+                <button type="button" className="chip" onClick={() => { unlockAudio(); window.setTimeout(() => chime("start"), 60); }}>▶ Inizio attività</button>
+                <button type="button" className="chip" onClick={() => { unlockAudio(); window.setTimeout(() => chime("rest"), 60); }}>▶ Inizio pausa</button>
+              </div>
+            </div>
             <label className="field-label">Orario di inizio compiti
               <input type="time" value={startTime} onChange={(e) => changeStartTime(e.target.value)}/>
             </label>

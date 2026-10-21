@@ -156,3 +156,6 @@ h2{font-size:20px;line-height:1.2}
 .app-list{display:flex;flex-direction:column;gap:6px;max-height:48vh;overflow:auto;margin-bottom:14px}
 .blocked-card{text-align:center}
 .blocked-card .subhead{margin:10px 0 18px}
+.sound-test{margin:14px 0}
+.sound-test strong{display:block;font-size:13px;margin-bottom:8px}
+.sound-test .chip{border:1px solid var(--line);background:var(--white);color:var(--ink);border-radius:99px;padding:8px 13px;font-size:12px;font-weight:600}

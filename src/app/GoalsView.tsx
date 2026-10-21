@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Gift, X } from "lucide-react";
 import { PageHero } from "./ui";
+import CityView from "./CityView";
 import Medal, { LevelBadge } from "./Medal";
 import { LEVELS, TIER_NAMES, WINDOW_DAYS, type Challenge, type MedalState, type Tier } from "@/lib/goals";
 
@@ -20,6 +21,7 @@ type Props = {
   rewardReady: boolean;
   onClaim: () => void;
   onEditReward: () => void;
+  houses: number;
   top: React.ReactNode;
 };
 
@@ -45,8 +47,9 @@ export default function GoalsView(p: Props) {
 
   return (
     <>
-    <PageHero top={p.top} eyebrow="TRAGUARDI" title="Non perdere il filo." sub="Ogni medaglia premia un modo di studiare che funziona davvero, non solo il tempo passato."/>
+    <PageHero top={p.top} eyebrow="LA MIA CITTÀ" title="Ogni cosa che impari costruisce qualcosa." sub="Ogni medaglia è un edificio, ogni sfida una casa. Mantienili vivi studiando con costanza."/>
     <section className="goals-page page-body">
+      <CityView medals={p.medals} records={p.records} level={p.level.level} houses={p.houses} onOpen={setOpen}/>
 
       <div className="level-card">
         <LevelBadge level={p.level.level} size={64}/>

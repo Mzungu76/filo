@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, ChevronDown, ChevronRight, Gift, Sparkles, House as HomeIcon, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, Gift, Sparkles, House as HomeIcon, Building2, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
@@ -818,7 +818,7 @@ export default function Home() {
   return (
     <main className={isHome ? "app-shell home-mode" : "app-shell"}>
             {view === "goals" ? (
-        <GoalsView top={topbar} level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
+        <GoalsView top={topbar} houses={Math.floor(bonus / 20)} level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
           challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
           onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
       ) : view === "stats" ? (
@@ -991,7 +991,7 @@ export default function Home() {
         <div className="bottom-nav-inner">
           <button className={view === "today" ? "nav-item active" : "nav-item"} onClick={() => setView("today")} aria-current={view === "today" ? "page" : undefined}><HomeIcon size={22}/>Oggi</button>
           <button className={view === "goals" ? "nav-item active" : "nav-item"} onClick={() => setView("goals")} aria-current={view === "goals" ? "page" : undefined}>
-            <Trophy size={22}/>Traguardi{(rewardReady || atRisk > 0) && <i className="nav-dot"/>}
+            <Building2 size={22}/>Città{(rewardReady || atRisk > 0) && <i className="nav-dot"/>}
           </button>
           <button className={view === "stats" ? "nav-item active" : "nav-item"} onClick={() => setView("stats")} aria-current={view === "stats" ? "page" : undefined}><BarChart3 size={22}/>Statistiche</button>
           <button className={showSettings ? "nav-item active" : "nav-item"} onClick={() => setShowSettings(true)}><Settings2 size={22}/>Impostazioni</button>

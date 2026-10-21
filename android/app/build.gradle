@@ -38,6 +38,12 @@ android {
             applicationIdSuffix ".lite"
             versionNameSuffix "-lite"
         }
+        // "mono": filò nero, minimale, schermo nero durante lo studio e tempi personalizzati.
+        mono {
+            dimension "edition"
+            applicationIdSuffix ".mono"
+            versionNameSuffix "-mono"
+        }
         // "solo": filò, solo il timer (aspetto diverso a ogni blocco) con blocco automatico delle notifiche.
         solo {
             dimension "edition"

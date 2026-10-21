@@ -12,6 +12,7 @@ import { computeStats } from "@/lib/stats";
 import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
 import FocusHome from "./FocusHome";
+import MonoApp from "./MonoApp";
 import SoloHome from "./SoloHome";
 import TimerFace, { STYLE_COUNT, styleVars } from "./TimerFaces";
 import { BigRing, Ring, subjectHue, tap } from "./ui";
@@ -74,7 +75,14 @@ function byDue(a: Task, b: Task) {
   return (a.dueDate ?? Infinity) - (b.dueDate ?? Infinity) || a.createdAt - b.createdAt;
 }
 
+/** Edizione "mono": solo timer nero, vintage, con tempi personalizzati (NEXT_PUBLIC_EDITION=mono). */
+const MONO = process.env.NEXT_PUBLIC_EDITION === "mono";
+
 export default function Home() {
+  return MONO ? <MonoApp/> : <FullApp/>;
+}
+
+function FullApp() {
   const [ready, setReady] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);

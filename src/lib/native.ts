@@ -66,6 +66,15 @@ export async function scheduleNative(phase: "work" | "break", endAt: number, wor
   try { await Focus.schedule({ events }); } catch {}
 }
 
+/** Un solo avviso, all'orario esatto di fine fase (suona anche con lo schermo spento). Dopo non parte nulla da solo. */
+export async function scheduleOne(phase: "work" | "break", endAt: number) {
+  if (!isNative()) return;
+  const ev: NativeEvent = phase === "work"
+    ? { id: 1, at: endAt, title: "Blocco finito", body: "Tocca per continuare.", silent: 0 }
+    : { id: 1, at: endAt, title: "Pausa finita", body: "Tocca per continuare.", silent: -1 };
+  try { await Focus.schedule({ events: [ev] }); } catch {}
+}
+
 /** Android: sceglie uno screenshot e ne legge il testo con il riconoscimento del sistema. null se annullato. */
 export async function pickAndReadImage(): Promise<string | null> {
   const r = await Ocr.pickAndRead();

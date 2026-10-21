@@ -9,3 +9,4 @@ out/
 keystore.base64.txt
 android/app/src/focus/assets/
 android/app/src/solo/assets/
+android/app/src/mono/assets/

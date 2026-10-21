@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
 import { askNotificationPermission, chime, keepAwake, notificationsSupported, notify, unlockAudio, vibrate } from "@/lib/alerts";
 import { useInstall } from "@/lib/install";
 import { advance as stepTimer } from "@/lib/timer";
+import { computeStats } from "@/lib/stats";
+import { pickQuote, type QuoteKind } from "@/lib/quotes";
+import StatsView from "./StatsView";
 import { SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
@@ -82,6 +85,15 @@ export default function Home() {
   const install = useInstall();
   const [native, setNative] = useState(false);
   const [silentOk, setSilentOk] = useState(false);
+  const [view, setView] = useState<"today" | "stats">("today");
+  const [quotesOn, setQuotesOn] = useState(true);
+  const [quote, setQuote] = useState<string | null>(null);
+  const [blockedQuote, setBlockedQuote] = useState("");
+  const modeRef = useRef<Mode>("idle");
+  const subjectRef = useRef("Altro");
+  const subjectMsRef = useRef<Record<string, number>>({});
+  const blocksRef = useRef(0);
+  const distractionsRef = useRef(0);
   const [guardOn, setGuardOn] = useState(false);
   const [guardApps, setGuardApps] = useState<string[]>([]);
   const [guardService, setGuardService] = useState(false);
@@ -104,6 +116,7 @@ export default function Home() {
       getSetting("alerts", true), getSetting("startTime", DEFAULT_START)
     ]);
     setPreset(savedPreset);
+    setQuotesOn(await getSetting("quotes", true));
     const [gOn, gApps] = await Promise.all([getSetting("guardOn", false), getSetting<string[]>("guardApps", [])]);
     setGuardOn(gOn);
     setGuardApps(gApps);
@@ -162,7 +175,14 @@ export default function Home() {
   // Se un'app bloccata è stata aperta, il servizio ci ha riportato qui: mostra il promemoria.
   useEffect(() => {
     if (!native || !guardOn) return;
-    const look = () => { void consumeBlocked().then((label) => { if (label) setBlockedApp(label); }); };
+    const look = () => {
+      void consumeBlocked().then((label) => {
+        if (!label) return;
+        if (modeRef.current === "work") distractionsRef.current++;
+        setBlockedQuote(pickQuote("blocked"));
+        setBlockedApp(label);
+      });
+    };
     look();
     const id = setInterval(look, 1500);
     document.addEventListener("visibilitychange", look);
@@ -176,9 +196,15 @@ export default function Home() {
       // Se l'app è rimasta sospesa, recupera tutte le fasi trascorse (blocco → pausa → blocco…).
       const r = stepTimer(mode, endAt, lastTickRef.current, t, plan);
       lastTickRef.current = t;
-      if (r.workMs > 0) setWorkSeconds((v) => v + r.workMs / 1000);
+      if (r.workMs > 0) {
+        setWorkSeconds((v) => v + r.workMs / 1000);
+        const name = subjectRef.current;
+        subjectMsRef.current[name] = (subjectMsRef.current[name] ?? 0) + r.workMs;
+      }
       setRemaining(Math.max(0, Math.ceil((r.endAt - t) / 1000)));
       if (r.crossed > 0) {
+        blocksRef.current += mode === "work" ? Math.ceil(r.crossed / 2) : Math.floor(r.crossed / 2);
+        setQuote(pickQuote(r.phase === "break" ? "break" : "start"));
         setMode(r.phase);
         setEndAt(r.endAt);
         // A fine pausa Android fa suonare l'avviso: il silenzioso riparte dopo, non subito.
@@ -215,9 +241,12 @@ export default function Home() {
     return Array.from(map.entries());
   }, [open]);
   const current = open.find((t) => t.id === focusId) ?? open[0];
+  subjectRef.current = current?.subject ?? "Altro";
+  modeRef.current = mode;
   const todayMinutes = sessions.filter((s) => s.startedAt >= startOfDay(now)).reduce((sum, s) => sum + s.workMinutes, 0);
   const weekMinutes = sessions.filter((s) => s.startedAt >= weekStart(now)).reduce((sum, s) => sum + s.workMinutes, 0);
 
+  const stats = useMemo(() => computeStats(sessions, tasks, Date.now(), startTime), [sessions, tasks, startTime]);
   const preview = useMemo(() => parseDidup(importText), [importText]);
   const toAdd = preview.filter((_, i) => !skipped.includes(i));
 
@@ -307,6 +336,12 @@ export default function Home() {
     setNotice("Hai 2 minuti: poi si torna al compito.");
   }
 
+  async function toggleQuotes() {
+    const next = !quotesOn;
+    setQuotesOn(next);
+    await setSetting("quotes", next);
+  }
+
   async function toggleAlerts() {
     const next = !alertsOn;
     setAlertsOn(next);
@@ -330,6 +365,7 @@ export default function Home() {
       ? { ...task, status: "todo", completedAt: undefined }
       : { ...task, status: "done", completedAt: Date.now() };
     await saveTask(next);
+    if (next.status === "done") setQuote(pickQuote("done"));
     await refresh();
   }
 
@@ -353,7 +389,11 @@ export default function Home() {
     prepareAlerts();
     setAdvance(null);
     const start = Date.now();
-    if (mode === "idle") { setSessionStart(start); setWorkSeconds(0); setLockedPlan(livePlan); }
+    if (mode === "idle") {
+      setSessionStart(start); setWorkSeconds(0); setLockedPlan(livePlan);
+      subjectMsRef.current = {}; blocksRef.current = 0; distractionsRef.current = 0;
+    }
+    setQuote(pickQuote("start"));
     startBlock(lockedPlan ?? livePlan);
     setNotice("");
   }
@@ -395,7 +435,10 @@ export default function Home() {
       await saveSession({
         id: uid(), startedAt: sessionStart, endedAt: end,
         workMinutes: Math.max(1, Math.round(workSeconds / 60)),
-        completedTaskIds: tasks.filter((t) => t.status === "done" && (t.completedAt || 0) >= sessionStart).map((t) => t.id)
+        completedTaskIds: tasks.filter((t) => t.status === "done" && (t.completedAt || 0) >= sessionStart).map((t) => t.id),
+        blocks: blocksRef.current,
+        distractions: distractionsRef.current,
+        subjectMinutes: Object.fromEntries(Object.entries(subjectMsRef.current).map(([k, ms]) => [k, Math.round(ms / 60000)]).filter(([, m]) => (m as number) > 0))
       });
     }
     if (timerRef.current) clearInterval(timerRef.current);
@@ -404,6 +447,7 @@ export default function Home() {
     void cancelNative();
     setMode("idle"); setEndAt(null); setSessionStart(null); setWorkSeconds(0);
     setLockedPlan(null);
+    setQuote(pickQuote("end"));
     const tomorrow = startOfDay(end) + DAY;
     const urgent = open.filter((t) => t.dueDate === undefined || t.dueDate <= tomorrow).length;
     const later = open.find((t) => t.dueDate !== undefined && t.dueDate > tomorrow);
@@ -422,10 +466,16 @@ export default function Home() {
         <span className="brand"><span className="brand-mark">f</span><span>filo</span></span>
         <span className="top-right">
           <span className="suggested">{startTime} · {plan.work}+{plan.rest} min</span>
+          <button className="icon-btn" aria-label={view === "stats" ? "Torna ai compiti" : "Statistiche"} onClick={() => setView(view === "stats" ? "today" : "stats")}>
+            {view === "stats" ? <ArrowLeft size={18}/> : <BarChart3 size={18}/>}
+          </button>
           <button className="icon-btn" aria-label="Impostazioni del programma" onClick={() => setShowSettings(true)}><Settings2 size={18}/></button>
         </span>
       </header>
 
+      {view === "stats" ? (
+        <StatsView stats={stats} quote={quotesOn ? quote ?? pickQuote("idle") : null}/>
+      ) : (<>
       {install.visible && !native && (
         <div className="install-banner" role="note">
           <Download size={18}/>
@@ -468,6 +518,7 @@ export default function Home() {
             </>
           )}
         </div>
+        {quotesOn && quote && <p className="quote on-dark">{quote}</p>}
         {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Chiudi avviso" onClick={() => setNotice("")}><X size={14}/></button></div>}
       </section>
 
@@ -581,6 +632,7 @@ export default function Home() {
         <div><div><strong>{weekMinutes} min</strong><span>questa settimana</span></div></div>
       </section>
       <p className="privacy-note">I tuoi dati restano su questo dispositivo. Nessun account.</p>
+      </>)}
 
       {blockedApp && mode === "work" && (
         <div className="modal-backdrop" role="presentation" style={{ zIndex: 30 }}>
@@ -588,6 +640,7 @@ export default function Home() {
             <p className="eyebrow">BLOCCO DI STUDIO</p>
             <h2 id="blocked-title">{blockedApp} aspetta la pausa.</h2>
             <p className="subhead">Mancano {formatTime(remaining)}. Un compito alla volta: {current ? `“${current.title}”` : "resta su Filo"}.</p>
+            {quotesOn && blockedQuote && <p className="quote">{blockedQuote}</p>}
             <button className="primary-btn dark full-btn" onClick={() => setBlockedApp(null)}>Resto sul compito</button>
             <button className="danger-link" onClick={() => void needTwoMinutes()}>Mi servono 2 minuti</button>
           </section>
@@ -671,6 +724,10 @@ export default function Home() {
                 )}
               </div>
             )}
+            <div className="notification-row">
+              <div><strong>Frasi motivazionali</strong><span>Una frase breve all’inizio di blocchi e pause, a fine sessione e quando chiudi un compito.</span></div>
+              <button className={quotesOn ? "toggle on" : "toggle"} onClick={toggleQuotes} type="button" role="switch" aria-checked={quotesOn} aria-label="Frasi motivazionali"><span/></button>
+            </div>
             <div className="sound-test">
               <strong>Suoni</strong>
               <div className="advance-actions">

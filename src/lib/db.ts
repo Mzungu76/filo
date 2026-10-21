@@ -16,6 +16,10 @@ export type StudySession = {
   endedAt: number;
   workMinutes: number;
   completedTaskIds: string[];
+  // Dettagli per le statistiche (assenti nelle sessioni salvate prima di questa versione)
+  blocks?: number;
+  distractions?: number;
+  subjectMinutes?: Record<string, number>;
 };
 
 interface FiloDB extends DBSchema {

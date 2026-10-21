@@ -33,7 +33,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      # L'SDK Android è già installato sul runner: basta accettare le licenze.
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
 
       - name: Install dependencies
         run: npm ci

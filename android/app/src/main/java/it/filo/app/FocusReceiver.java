@@ -36,11 +36,29 @@ public class FocusReceiver extends BroadcastReceiver {
         if (nm == null || !nm.isNotificationPolicyAccessGranted()) return;
         if (on) {
             if (!prefs.getBoolean("active", false)) {
-                prefs.edit().putBoolean("active", true).putInt("previous", nm.getCurrentInterruptionFilter()).apply();
+                NotificationManager.Policy old = nm.getNotificationPolicy();
+                prefs.edit().putBoolean("active", true).putInt("previous", nm.getCurrentInterruptionFilter())
+                        .putInt("pol_cat", old.priorityCategories).putInt("pol_calls", old.priorityCallSenders)
+                        .putInt("pol_msgs", old.priorityMessageSenders).putInt("pol_fx", old.suppressedVisualEffects).apply();
             }
-            nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS);
+            // Solo priorità, ma con una regola nostra: passano le chiamate (da chiunque) e le sveglie (i suoni di Filo);
+            // messaggi, app e notifiche restano zitti.
+            int cats = NotificationManager.Policy.PRIORITY_CATEGORY_CALLS | NotificationManager.Policy.PRIORITY_CATEGORY_ALARMS;
+            try {
+                nm.setNotificationPolicy(new NotificationManager.Policy(cats, NotificationManager.Policy.PRIORITY_SENDERS_ANY,
+                        NotificationManager.Policy.PRIORITY_SENDERS_ANY, 0));
+                nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY);
+            } catch (Throwable t) {
+                nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS);
+            }
         } else if (prefs.getBoolean("active", false)) {
             int previous = prefs.getInt("previous", NotificationManager.INTERRUPTION_FILTER_ALL);
+            if (prefs.contains("pol_cat")) {
+                try {
+                    nm.setNotificationPolicy(new NotificationManager.Policy(prefs.getInt("pol_cat", 0), prefs.getInt("pol_calls", 0),
+                            prefs.getInt("pol_msgs", 0), prefs.getInt("pol_fx", 0)));
+                } catch (Throwable ignored) { }
+            }
             nm.setInterruptionFilter(previous == NotificationManager.INTERRUPTION_FILTER_UNKNOWN
                     ? NotificationManager.INTERRUPTION_FILTER_ALL : previous);
             prefs.edit().putBoolean("active", false).apply();

@@ -1,6 +1,7 @@
 "use client";
 
 import { Lightbulb, Sparkles } from "lucide-react";
+import { PageHero } from "./ui";
 import type { Stats } from "@/lib/stats";
 
 function fmt(minutes: number) {
@@ -24,7 +25,7 @@ function Bars({ rows }: { rows: { label: string; value: number; hint?: string; s
   );
 }
 
-export default function StatsView({ stats, quote }: { stats: Stats; quote: string | null }) {
+export default function StatsView({ stats, quote, top }: { stats: Stats; quote: string | null; top: React.ReactNode }) {
   const { week, bars, buckets, bestBucket, subjects, tasks, focus, tips } = stats;
   const delta = week.prevMinutes > 0 ? Math.round(((week.minutes - week.prevMinutes) / week.prevMinutes) * 100) : null;
   const maxBar = Math.max(1, ...bars.map((b) => b.minutes));
@@ -32,22 +33,22 @@ export default function StatsView({ stats, quote }: { stats: Stats; quote: strin
 
   if (!stats.hasData) {
     return (
-      <section className="stats-page">
-        <p className="eyebrow">STATISTICHE</p>
-        <h1>Ancora niente da mostrare.</h1>
-        <p className="subhead">Le statistiche compaiono dopo la tua prima sessione: tempo di studio, momenti migliori, materie e consigli su misura.</p>
-        {quote && <p className="quote">{quote}</p>}
-      </section>
+      <>
+        <PageHero top={top} eyebrow="STATISTICHE" title="Ancora niente da mostrare." sub="Le statistiche compaiono dopo la tua prima sessione: tempo di studio, momenti migliori, materie e consigli su misura."/>
+        <section className="stats-page page-body">{quote && <p className="quote">{quote}</p>}</section>
+      </>
     );
   }
 
   return (
-    <section className="stats-page">
-      <p className="eyebrow">QUESTA SETTIMANA</p>
+    <>
+    <PageHero top={top} eyebrow="QUESTA SETTIMANA">
       <div className="stat-hero">
         <strong>{fmt(week.minutes)}</strong>
         {delta !== null && <span className={delta >= 0 ? "delta up" : "delta down"}>{delta >= 0 ? "+" : "−"}{Math.abs(delta)}% sulla scorsa settimana</span>}
       </div>
+    </PageHero>
+    <section className="stats-page page-body">
       <div className="summary-grid">
         <div className="summary-card"><span>Giorni di studio</span><strong>{week.activeDays}<small>/{week.elapsedDays}</small></strong></div>
         <div className="summary-card"><span>Sessioni</span><strong>{week.sessions}</strong></div>
@@ -117,5 +118,6 @@ export default function StatsView({ stats, quote }: { stats: Stats; quote: strin
         </div>
       )}
     </section>
+    </>
   );
 }

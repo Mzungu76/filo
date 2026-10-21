@@ -817,14 +817,12 @@ export default function Home() {
 
   return (
     <main className={isHome ? "app-shell home-mode" : "app-shell"}>
-      {!isHome && topbar}
-
-      {view === "goals" ? (
-        <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
+            {view === "goals" ? (
+        <GoalsView top={topbar} level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
           challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
           onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
       ) : view === "stats" ? (
-        <StatsView stats={stats} quote={quotesOn ? quote ?? pickQuote("idle") : null}/>
+        <StatsView top={topbar} stats={stats} quote={quotesOn ? quote ?? pickQuote("idle") : null}/>
       ) : (<>
       <section className="home-hero">
         {topbar}
@@ -864,9 +862,9 @@ export default function Home() {
         </div>
 
         {mode === "idle" && (
-          <div className="preset-row" role="group" aria-label="Ritmo di studio">
+          <div className="hp-row" role="group" aria-label="Ritmo di studio">
             {(["auto", "few", "medium", "many"] as Preset[]).map((p) => (
-              <button key={p} className={preset === p ? "preset on" : "preset"} onClick={() => void choosePreset(p)}>
+              <button key={p} className={preset === p ? "hp on" : "hp"} onClick={() => void choosePreset(p)}>
                 {p === "auto" ? "Auto" : LEVELS[p].label}
               </button>
             ))}

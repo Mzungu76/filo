@@ -68,3 +68,16 @@ export function BigRing({ value, children }: { value: number; children?: React.R
     </div>
   );
 }
+
+/** Intestazione scura condivisa dalle pagine (stesso stile della home). */
+export function PageHero({ top, eyebrow, title, sub, children }: { top: React.ReactNode; eyebrow: string; title?: string; sub?: string; children?: React.ReactNode }) {
+  return (
+    <header className="page-hero">
+      {top}
+      <p className="eyebrow">{eyebrow}</p>
+      {title && <h1>{title}</h1>}
+      {sub && <p className="subhead">{sub}</p>}
+      {children}
+    </header>
+  );
+}

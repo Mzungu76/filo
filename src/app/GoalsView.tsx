@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Gift, X } from "lucide-react";
+import { PageHero } from "./ui";
 import Medal, { LevelBadge } from "./Medal";
 import { LEVELS, TIER_NAMES, WINDOW_DAYS, type Challenge, type MedalState, type Tier } from "@/lib/goals";
 
@@ -19,6 +20,7 @@ type Props = {
   rewardReady: boolean;
   onClaim: () => void;
   onEditReward: () => void;
+  top: React.ReactNode;
 };
 
 const TIER = TIER_NAMES;
@@ -42,10 +44,9 @@ export default function GoalsView(p: Props) {
   const families = ["Costanza", "Efficacia", "Organizzazione", "Equilibrio", "Impegno"] as const;
 
   return (
-    <section className="goals-page">
-      <p className="eyebrow">TRAGUARDI</p>
-      <h1>Non perdere il filo.</h1>
-      <p className="subhead">Ogni medaglia premia un modo di studiare che funziona davvero, non solo il tempo passato.</p>
+    <>
+    <PageHero top={p.top} eyebrow="TRAGUARDI" title="Non perdere il filo." sub="Ogni medaglia premia un modo di studiare che funziona davvero, non solo il tempo passato."/>
+    <section className="goals-page page-body">
 
       <div className="level-card">
         <LevelBadge level={p.level.level} size={64}/>
@@ -153,5 +154,6 @@ export default function GoalsView(p: Props) {
         </div>
       )}
     </section>
+    </>
   );
 }

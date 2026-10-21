@@ -37,6 +37,14 @@
         </provider>
     </application>
 
+    <!-- Per elencare le app installabili tra cui scegliere quelle da bloccare -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

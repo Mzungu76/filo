@@ -6,11 +6,20 @@ type FocusPlugin = {
   hasAccess(): Promise<{ granted: boolean }>;
   openAccessSettings(): Promise<void>;
   setSilent(o: { on: boolean }): Promise<void>;
+  setBars(o: { blackout: boolean }): Promise<void>;
   schedule(o: { events: NativeEvent[] }): Promise<void>;
   cancel(): Promise<void>;
+  guardStatus(): Promise<{ available: boolean; serviceEnabled: boolean; on: boolean }>;
+  openAccessibilitySettings(): Promise<void>;
+  openAppInfo(): Promise<void>;
+  listApps(): Promise<{ apps: { package: string; label: string }[] }>;
+  setGuard(o: { on: boolean; apps: string[] }): Promise<void>;
+  snooze(o: { minutes: number }): Promise<void>;
+  consumeBlocked(): Promise<{ label?: string }>;
 };
 
 const Focus = registerPlugin<FocusPlugin>("Focus");
+const Ocr = registerPlugin<{ pickAndRead(): Promise<{ cancelled: boolean; text: string }> }>("Ocr");
 
 /** true solo dentro l'app Android (APK): nel browser tutto questo è disattivato. */
 export const isNative = () => Capacitor.isNativePlatform();
@@ -56,4 +65,69 @@ export async function scheduleNative(phase: "work" | "break", endAt: number, wor
     }
   }
   try { await Focus.schedule({ events }); } catch {}
+}
+
+/** Un solo avviso, all'orario esatto di fine fase (suona anche con lo schermo spento). Dopo non parte nulla da solo. */
+export async function scheduleOne(phase: "work" | "break", endAt: number) {
+  if (!isNative()) return;
+  const ev: NativeEvent = phase === "work"
+    ? { id: 1, at: endAt, title: "Blocco finito", body: "Tocca per continuare.", silent: 0 }
+    : { id: 1, at: endAt, title: "Pausa finita", body: "Tocca per continuare.", silent: -1 };
+  try { await Focus.schedule({ events: [ev] }); } catch {}
+}
+
+/** Android: sceglie uno screenshot e ne legge il testo con il riconoscimento del sistema. null se annullato. */
+export async function pickAndReadImage(): Promise<string | null> {
+  const r = await Ocr.pickAndRead();
+  return r.cancelled ? null : r.text;
+}
+
+// ---- Blocco distrazioni ----
+
+/** App tipiche di distrazione: preselezionate se installate. */
+export const SUGGESTED_BLOCKED = [
+  "com.whatsapp", "com.whatsapp.w4b", "com.instagram.android", "com.zhiliaoapp.musically", "com.ss.android.ugc.trill",
+  "com.google.android.youtube", "com.snapchat.android", "org.telegram.messenger", "com.discord",
+  "com.facebook.katana", "com.facebook.orca", "com.twitter.android", "tv.twitch.android.app",
+  "com.reddit.frontpage", "com.pinterest", "com.netflix.mediaclient", "com.instagram.barcelona"
+];
+
+export async function guardStatus() {
+  if (!isNative()) return { available: false, serviceEnabled: false, on: false };
+  try { return await Focus.guardStatus(); } catch { return { available: false, serviceEnabled: false, on: false }; }
+}
+export async function openAccessibilitySettings() { try { await Focus.openAccessibilitySettings(); } catch {} }
+export async function openAppInfo() { try { await Focus.openAppInfo(); } catch {} }
+export async function listApps() {
+  if (!isNative()) return [];
+  try { return (await Focus.listApps()).apps; } catch { return []; }
+}
+export async function setGuard(on: boolean, apps: string[]) {
+  if (!isNative()) return;
+  try { await Focus.setGuard({ on, apps }); } catch {}
+}
+export async function snoozeGuard(minutes: number) {
+  if (!isNative()) return;
+  try { await Focus.snooze({ minutes }); } catch {}
+}
+/** Nome dell'app bloccata più di recente (e la dimentica), oppure null. */
+export async function consumeBlocked(): Promise<string | null> {
+  if (!isNative()) return null;
+  try { return (await Focus.consumeBlocked()).label ?? null; } catch { return null; }
+}
+
+/** Barre di stato e di navigazione nere; con blackout anche icone e testo neri (schermo "spento"). */
+export async function setBars(blackout: boolean) {
+  if (!isNative()) return;
+  try { await Focus.setBars({ blackout }); } catch {}
+}
+
+/** Colora la barra di stato di Android in base al tema. */
+export async function setStatusBar(dark: boolean, color?: string) {
+  if (!isNative()) return;
+  try {
+    const { StatusBar, Style } = await import("@capacitor/status-bar");
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+    await StatusBar.setBackgroundColor({ color: color ?? (dark ? "#0b1721" : "#f2f6f5") });
+  } catch {}
 }

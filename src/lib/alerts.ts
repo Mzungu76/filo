@@ -9,25 +9,31 @@ export function unlockAudio() {
     if (!Ctor) return;
     ctx = ctx ?? new Ctor();
     if (ctx.state === "suspended") void ctx.resume();
+    void preload("start");
+    void preload("rest");
   } catch {}
 }
 
-/** Breve melodia: "start" sale (si riparte), "rest" scende (pausa). */
+const SOUND_URL = { start: "/sounds/sound_focus.wav", rest: "/sounds/sound_break.wav" } as const;
+const buffers: Partial<Record<"start" | "rest", AudioBuffer>> = {};
+
+async function preload(kind: "start" | "rest") {
+  if (!ctx || buffers[kind]) return;
+  try {
+    const res = await fetch(SOUND_URL[kind]);
+    buffers[kind] = await ctx.decodeAudioData(await res.arrayBuffer());
+  } catch {}
+}
+
+/** Due suoni distinti: "start" = inizio attività (campanelli che salgono), "rest" = inizio pausa (toni morbidi che scendono). */
 export function chime(kind: "start" | "rest") {
   if (!ctx) return;
-  const notes = kind === "start" ? [523, 659, 784] : [784, 659, 523];
-  notes.forEach((freq, i) => {
-    const osc = ctx!.createOscillator();
-    const gain = ctx!.createGain();
-    const t = ctx!.currentTime + i * 0.28;
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-    osc.connect(gain).connect(ctx!.destination);
-    osc.start(t);
-    osc.stop(t + 0.55);
-  });
+  const buffer = buffers[kind];
+  if (!buffer) { void preload(kind); return; }
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start();
 }
 
 export function vibrate() {

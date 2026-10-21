@@ -16,10 +16,52 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Firma stabile: se la Action fornisce la chiave (segreti del repository), la versione "release" viene firmata con quella,
+    // così ogni aggiornamento si installa sopra il precedente. Senza chiave si ricade sulla firma di debug (build di prova).
+    def keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+    signingConfigs {
+        if (keystoreFile) {
+            release {
+                storeFile file(keystoreFile)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    // "full": con blocco delle altre app. "lite": senza servizio di accessibilità (installabile accanto alla full).
+    flavorDimensions "edition"
+    productFlavors {
+        full { dimension "edition" }
+        lite {
+            dimension "edition"
+            applicationIdSuffix ".lite"
+            versionNameSuffix "-lite"
+        }
+        // "mono": filò nero, minimale, schermo nero durante lo studio e tempi personalizzati.
+        mono {
+            dimension "edition"
+            applicationIdSuffix ".mono"
+            versionNameSuffix "-mono"
+        }
+        // "solo": filò, solo il timer (aspetto diverso a ogni blocco) con blocco automatico delle notifiche.
+        solo {
+            dimension "edition"
+            applicationIdSuffix ".solo"
+            versionNameSuffix "-solo"
+        }
+        // "focus": app separata e minimale (solo timer e compiti); il suo codice web arriva da src/focus/assets.
+        focus {
+            dimension "edition"
+            applicationIdSuffix ".focus"
+            versionNameSuffix "-focus"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig keystoreFile ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
@@ -35,6 +77,8 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // Riconoscimento testo sul telefono (modello incluso, funziona offline)
+    implementation "com.google.mlkit:text-recognition:16.0.1"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

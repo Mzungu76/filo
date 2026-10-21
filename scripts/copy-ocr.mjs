@@ -2,6 +2,9 @@
 // funziona dal nostro dominio, senza servizi esterni.
 import { cpSync, mkdirSync } from "node:fs";
 
+// L'app Android legge gli screenshot con il riconoscimento del sistema (ML Kit): niente motore OCR nell'APK (-10 MB).
+if (process.env.BUILD_TARGET === "android") process.exit(0);
+
 const out = "public/ocr";
 mkdirSync(out, { recursive: true });
 const core = "node_modules/tesseract.js-core";

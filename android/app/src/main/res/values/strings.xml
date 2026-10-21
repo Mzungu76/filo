@@ -4,4 +4,6 @@
     <string name="title_activity_main">Filo</string>
     <string name="package_name">it.filo.app</string>
     <string name="custom_url_scheme">it.filo.app</string>
+    <string name="guard_label">Filo - blocco distrazioni</string>
+    <string name="guard_description">Durante i blocchi di studio, quando apri una delle app che hai scelto (social, messaggi, video) ti riporta a Filo. Riceve solo il nome dell\'app aperta: non legge lo schermo né i messaggi.</string>
 </resources>

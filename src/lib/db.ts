@@ -16,6 +16,11 @@ export type StudySession = {
   endedAt: number;
   workMinutes: number;
   completedTaskIds: string[];
+  // Dettagli per le statistiche (assenti nelle sessioni salvate prima di questa versione)
+  blocks?: number;
+  distractions?: number;
+  resisted?: number; // volte in cui, aprendo un'app bloccata, si è scelto di restare sul compito
+  subjectMinutes?: Record<string, number>;
 };
 
 interface FiloDB extends DBSchema {

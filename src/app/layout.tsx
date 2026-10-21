@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "Compiti, timer e pause. Un passo alla volta.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Filo" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" }
+  icons: { icon: "/icon.svg", apple: "/icon-180.png" }
 };
 
 export const viewport: Viewport = {

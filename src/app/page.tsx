@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ClipboardPaste, Coffee, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
+import { askNotificationPermission, chime, keepAwake, notificationsSupported, notify, unlockAudio, vibrate } from "@/lib/alerts";
+import { useInstall } from "@/lib/install";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
 
 // Programma suggerito: blocchi brevi con pausa, un compito alla volta. Le durate dipendono dal preset.
-const START_TIME = "16:30";
+const DEFAULT_START = "16:30";
 const DAY = 24 * 3600 * 1000;
 
 function uid() {
@@ -65,14 +67,26 @@ export default function Home() {
   const [importText, setImportText] = useState("");
   const [skipped, setSkipped] = useState<number[]>([]);
   const [reading, setReading] = useState<number | null>(null);
+  const [alertsOn, setAlertsOn] = useState(true);
+  const [startTime, setStartTime] = useState(DEFAULT_START);
+  const [advance, setAdvance] = useState<Task | null>(null);
+  const install = useInstall();
+  const alertRef = useRef<(title: string, body: string, kind: "start" | "rest") => void>(() => {});
+  const remindedRef = useRef("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const livePlan = useMemo(() => planFor(preset, tasks), [preset, tasks]);
   const plan = lockedPlan ?? livePlan;
+  const open = useMemo(() => tasks.filter((t) => t.status === "todo").sort(byDue), [tasks]);
 
   const refresh = useCallback(async () => {
-    const [nextTasks, nextSessions, savedPreset] = await Promise.all([getTasks(), getSessions(), getSetting<Preset>("preset", "auto")]);
+    const [nextTasks, nextSessions, savedPreset, savedAlerts, savedStart] = await Promise.all([
+      getTasks(), getSessions(), getSetting<Preset>("preset", "auto"),
+      getSetting("alerts", true), getSetting("startTime", DEFAULT_START)
+    ]);
     setPreset(savedPreset);
+    setAlertsOn(savedAlerts);
+    setStartTime(savedStart);
     setTasks(nextTasks);
     setSessions(nextSessions);
     setReady(true);
@@ -82,6 +96,31 @@ export default function Home() {
     refresh().catch(() => setReady(true));
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, [refresh]);
+
+  // Suono e vibrazione sempre; notifica solo se l'app non è in primo piano.
+  alertRef.current = (title, body, kind) => {
+    if (!alertsOn) return;
+    chime(kind);
+    vibrate();
+    if (document.hidden) void notify(title, body);
+  };
+
+  useEffect(() => { keepAwake(mode === "work" || mode === "break"); }, [mode]);
+
+  // Promemoria all'orario di inizio (funziona finché Filo è aperto).
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      const key = `${d.toDateString()} ${startTime}`;
+      const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      if (hhmm === startTime && remindedRef.current !== key && mode === "idle" && open.length > 0) {
+        remindedRef.current = key;
+        alertRef.current("È ora di iniziare", `Hai ${open.length} ${open.length === 1 ? "compito" : "compiti"} da fare. Un passo alla volta.`, "start");
+        setNotice("È ora di iniziare i compiti.");
+      }
+    }, 20000);
+    return () => clearInterval(id);
+  }, [startTime, mode, open]);
 
   useEffect(() => {
     if (mode !== "work" && mode !== "break") return;
@@ -98,10 +137,12 @@ export default function Home() {
           setRemaining(plan.rest * 60);
           setEndAt(Date.now() + plan.rest * 60 * 1000);
           setNotice(`Blocco completato. Pausa di ${plan.rest} minuti: alzati e muoviti un po’.`);
+          alertRef.current("Blocco completato", `Pausa di ${plan.rest} minuti.`, "rest");
         } else {
           setMode("paused");
           setEndAt(null);
           setNotice("Pausa finita. Quando vuoi, riparti.");
+          alertRef.current("Pausa finita", "Quando sei pronto, riparti.", "start");
         }
       }
     }, 1000);
@@ -109,7 +150,6 @@ export default function Home() {
   }, [mode, endAt, plan]);
 
   const now = Date.now();
-  const open = useMemo(() => tasks.filter((t) => t.status === "todo").sort(byDue), [tasks]);
   const doneToday = useMemo(
     () => tasks.filter((t) => t.status === "done" && t.completedAt && t.completedAt >= startOfDay(Date.now())),
     [tasks]
@@ -181,6 +221,19 @@ export default function Home() {
     }
   }
 
+  async function toggleAlerts() {
+    const next = !alertsOn;
+    setAlertsOn(next);
+    await setSetting("alerts", next);
+    if (next) { unlockAudio(); chime("start"); await askNotificationPermission(); }
+  }
+
+  async function changeStartTime(value: string) {
+    if (!value) return;
+    setStartTime(value);
+    await setSetting("startTime", value);
+  }
+
   async function choosePreset(next: Preset) {
     setPreset(next);
     await setSetting("preset", next);
@@ -199,7 +252,14 @@ export default function Home() {
     await refresh();
   }
 
+  function prepareAlerts() {
+    unlockAudio();
+    if (alertsOn) void askNotificationPermission();
+  }
+
   function startWork() {
+    prepareAlerts();
+    setAdvance(null);
     const start = Date.now();
     if (mode === "idle") { setSessionStart(start); setWorkSeconds(0); setLockedPlan(livePlan); }
     startBlock(lockedPlan ?? livePlan);
@@ -211,13 +271,14 @@ export default function Home() {
     setEndAt(Date.now() + p.work * 60 * 1000);
     setNotice("");
   }
-  function resumeWork() { startBlock(plan); }
+  function resumeWork() { unlockAudio(); startBlock(plan); }
   function pauseTimer() {
     setMode("paused");
     setEndAt(null);
     setNotice("Timer in pausa. Puoi riprendere quando sei pronto.");
   }
   function startBreak() {
+    unlockAudio();
     setMode("break");
     setRemaining(plan.rest * 60);
     setEndAt(Date.now() + plan.rest * 60 * 1000);
@@ -237,7 +298,13 @@ export default function Home() {
     timerRef.current = null;
     setMode("idle"); setEndAt(null); setSessionStart(null); setWorkSeconds(0);
     setLockedPlan(null);
-    setNotice("Sessione chiusa. Bel lavoro.");
+    const tomorrow = startOfDay(end) + DAY;
+    const urgent = open.filter((t) => t.dueDate === undefined || t.dueDate <= tomorrow).length;
+    const later = open.find((t) => t.dueDate !== undefined && t.dueDate > tomorrow);
+    setAdvance(later ?? null);
+    setNotice(urgent > 0
+      ? `Sessione chiusa. Restano ${urgent} ${urgent === 1 ? "compito" : "compiti"} per oggi o domani.`
+      : "Sessione chiusa. Bel lavoro.");
     await refresh();
   }
 
@@ -248,10 +315,24 @@ export default function Home() {
       <header className="topbar">
         <span className="brand"><span className="brand-mark">f</span><span>filo</span></span>
         <span className="top-right">
-          <span className="suggested">{START_TIME} · {plan.work}+{plan.rest} min</span>
+          <span className="suggested">{startTime} · {plan.work}+{plan.rest} min</span>
           <button className="icon-btn" aria-label="Impostazioni del programma" onClick={() => setShowSettings(true)}><Settings2 size={18}/></button>
         </span>
       </header>
+
+      {install.visible && (
+        <div className="install-banner" role="note">
+          <Download size={18}/>
+          <span>
+            <strong>Installa Filo sul telefono</strong>
+            {install.ios
+              ? " Tocca Condividi e poi “Aggiungi alla schermata Home”: si apre a schermo intero e gli avvisi funzionano meglio."
+              : " Si apre a schermo intero, come un’app, e gli avvisi funzionano meglio."}
+          </span>
+          {!install.ios && <button className="install-go" onClick={install.install}>Installa</button>}
+          <button className="install-x" aria-label="Non ora" onClick={install.dismiss}><X size={14}/></button>
+        </div>
+      )}
 
       <section className="timer-card">
         <div className="timer-top">
@@ -283,6 +364,17 @@ export default function Home() {
         </div>
         {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Chiudi avviso" onClick={() => setNotice("")}><X size={14}/></button></div>}
       </section>
+
+      {advance && mode === "idle" && (
+        <div className="advance-card" role="dialog" aria-label="Vuoi avvantaggiarti?">
+          <strong>Vuoi avvantaggiarti?</strong>
+          <p>Per oggi sei a posto. Il prossimo compito in scadenza è{advance.subject ? ` ${advance.subject}` : ""}: “{advance.title}” ({dueLabel(advance.dueDate, now).toLowerCase()}).</p>
+          <div className="advance-actions">
+            <button className="primary-btn dark" onClick={() => { setFocusId(advance.id); setAdvance(null); startWork(); }}>Sì, iniziamo</button>
+            <button className="secondary-light" onClick={() => setAdvance(null)}>No, per oggi basta</button>
+          </div>
+        </div>
+      )}
 
       <section className="tasks-section">
         <div className="section-heading">
@@ -390,6 +482,20 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            <div className="notification-row">
+              <div><strong>Suono e notifiche</strong><span>Avvisi a fine blocco, fine pausa e all’orario di inizio.</span></div>
+              <button className={alertsOn ? "toggle on" : "toggle"} onClick={toggleAlerts} type="button" role="switch" aria-checked={alertsOn} aria-label="Suono e notifiche"><span/></button>
+            </div>
+            <label className="field-label">Orario di inizio compiti
+              <input type="time" value={startTime} onChange={(e) => changeStartTime(e.target.value)}/>
+            </label>
+            <details className="silent-tips">
+              <summary>Come attivare il silenzioso mentre studi</summary>
+              <p>Un’app web non può cambiare le impostazioni audio del telefono: si fa una volta sola dal telefono, e poi è automatico.</p>
+              <p><strong>iPhone:</strong> app Comandi → Automazione → “Quando apro un’app” → Filo → “Imposta Focus” → Non disturbare (e “Quando chiudo” per disattivarlo).</p>
+              <p><strong>Android:</strong> Impostazioni → Benessere digitale (o “Modalità”) → Modalità concentrazione/Non disturbare → scegli Filo come app da pianificare o attiva la modalità quando inizi.</p>
+              {!notificationsSupported() && <p>Questo browser non supporta le notifiche: resteranno suono e vibrazione.</p>}
+            </details>
             <p className="field-help">Il programma automatico considera i compiti per oggi e domani, quante materie sono e quanto lavoro richiede ciascuna. Il timer in corso non cambia durata a metà sessione.</p>
           </section>
         </div>

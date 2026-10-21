@@ -131,3 +131,13 @@ h2{font-size:20px;line-height:1.2}
 .preset{display:flex;flex-direction:column;gap:3px;text-align:left;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:var(--white);color:var(--ink)}
 .preset strong{font-size:14px}.preset span{font-size:12px;color:var(--ink-soft);line-height:1.4}
 .preset.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:#f2f8f6}
+.install-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:12px;background:#eaf0f2;border-radius:14px;font-size:12px;line-height:1.45;color:var(--ink-soft)}
+.install-banner strong{color:var(--ink)}.install-banner>span{flex:1}
+.install-go{border:0;border-radius:10px;background:var(--ink);color:white;padding:9px 12px;font-weight:700;font-size:12px}
+.install-x{border:0;background:transparent;color:var(--muted);padding:4px}
+.advance-card{margin-top:14px;padding:16px;border:1px solid var(--mint-strong);background:#f2f8f6;border-radius:16px}
+.advance-card strong{font-size:16px}.advance-card p{margin:7px 0 12px;font-size:13px;line-height:1.5;color:var(--ink-soft)}
+.advance-actions{display:flex;flex-wrap:wrap;gap:8px}.advance-actions .secondary-light{margin:0}
+.silent-tips{margin:14px 0;font-size:12px;line-height:1.5;color:var(--ink-soft)}
+.silent-tips summary{font-weight:700;color:var(--ink);cursor:pointer}
+.silent-tips p{margin:8px 0}

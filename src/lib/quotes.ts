@@ -1,51 +1,52 @@
 export type QuoteKind = "start" | "break" | "done" | "end" | "blocked" | "idle";
 
-// Frasi originali (nessuna attribuita a persone reali): brevi, concrete, senza prediche.
+// Frasi semplici e dirette, o celebri (con l'autore): niente prediche.
 const QUOTES: Record<QuoteKind, string[]> = {
   start: [
-    "Non devi sentirti pronto. Devi solo iniziare: la voglia, spesso, arriva dopo i primi cinque minuti.",
-    "Un blocco è piccolo apposta: stai promettendo pochi minuti, non tutto il pomeriggio.",
-    "Il cervello detesta le cose enormi. Per questi minuti esiste un solo compito.",
-    "Un primo passo imperfetto batte un passo perfetto mai fatto.",
-    "Rendi facile iniziare: apri il quaderno, scrivi la data. Il resto segue da solo.",
-    "La concentrazione si allena a blocchi, non a maratone.",
-    "Se la mente scappa, riportala con gentilezza. Il ritorno è l'allenamento, non l'errore.",
-    "Quello che stai per fare conta meno della scelta di farlo adesso."
+    "Un viaggio di mille miglia comincia con un singolo passo. — Lao Tzu",
+    "Fatto è meglio che perfetto. — Sheryl Sandberg",
+    "Comincia. La voglia arriva dopo.",
+    "Affrettati lentamente. — Augusto",
+    "Solo questo compito, solo questi minuti.",
+    "Il modo per iniziare è smettere di parlare e cominciare a fare. — Walt Disney",
+    "Apri il quaderno. Scrivi la data. Il resto viene da sé.",
+    "Non pensare a tutto. Pensa al prossimo blocco."
   ],
   break: [
-    "La pausa non è tempo perso: è lì che il cervello mette in ordine ciò che hai appena fatto.",
-    "Alzati, bevi un bicchiere d'acqua, guarda fuori dalla finestra. Meglio se lontano da uno schermo.",
-    "Hai finito un blocco intero: riposa senza sensi di colpa, te la sei guadagnata.",
-    "Due minuti di movimento riposano più di dieci minuti di telefono.",
-    "Respira lentamente tre volte. Poi, quando suona, riparti da dove eri.",
-    "Se durante il blocco ti è venuta un'idea, scrivila e lasciala lì: sarà ancora tua dopo.",
-    "Per adesso il tuo unico compito è riposare. Il prossimo blocco sarà più leggero."
+    "Il riposo è il condimento del lavoro. — Plutarco",
+    "Alzati, bevi un po' d'acqua, guarda fuori.",
+    "Telefono giù: due minuti di movimento riposano di più.",
+    "Respira. Tra poco si riparte.",
+    "Te la sei guadagnata.",
+    "Se ti è venuta un'idea, scrivila e lasciala lì.",
+    "Pausa vera: occhi lontani dallo schermo."
   ],
   done: [
-    "Un compito in meno è un pensiero in meno. Fermati un secondo e notalo.",
-    "Chiudere le cose è una competenza, e ti stai allenando.",
-    "Fatto. Il te di domani ti ringrazia.",
-    "Non era enorme: lo era diventato solo nella testa. Adesso è chiuso.",
-    "Ogni spunta è una prova concreta che ce la fai, anche nei giorni pesanti.",
-    "Quello che hai appena chiuso non torna indietro: è guadagnato."
+    "Tutto sembra impossibile finché non viene fatto. — Nelson Mandela",
+    "Uno in meno.",
+    "Fatto. Spunta e respira.",
+    "Sono dolci le fatiche passate. — Cicerone",
+    "Un compito chiuso non torna indietro."
   ],
   end: [
-    "Quello che conta non è quanto hai fatto, ma che sei tornato a farlo.",
-    "Anche un solo blocco vale: la costanza si costruisce con giorni normali, non eroici.",
-    "Prima di staccare, scrivi dove riparti domani: sarai più leggero.",
-    "Hai lavorato per il te di domani. Adesso riposa davvero.",
-    "Un buon pomeriggio non si misura in ore, ma nel sentirti a posto."
+    "Siamo ciò che facciamo ogni giorno. L'eccellenza è un'abitudine. — Will Durant",
+    "La goccia scava la roccia non con la forza, ma cadendo spesso. — Ovidio",
+    "Il successo è la somma di piccoli sforzi ripetuti giorno dopo giorno. — Robert Collier",
+    "Anche un solo blocco conta.",
+    "Scrivi dove riparti domani, poi stacca.",
+    "Per oggi basta così. Bel lavoro."
   ],
   blocked: [
-    "Il messaggio può aspettare pochi minuti. Il tuo focus, una volta perso, costa molto di più a ricostruirsi.",
-    "Ogni volta che resisti, la volta dopo costa meno.",
-    "Quella app è progettata per catturarti. Tu stai scegliendo chi decide.",
-    "Non è forza di volontà infinita: è solo aspettare la pausa, che arriva presto."
+    "Non è che abbiamo poco tempo: ne sprechiamo molto. — Seneca",
+    "Il messaggio può aspettare la pausa.",
+    "Resisti ancora un po': la pausa arriva.",
+    "Torna a Filo. Ci sei quasi."
   ],
   idle: [
-    "Il momento giusto per iniziare quasi mai arriva da solo: lo si crea con il primo blocco.",
-    "Parti dal compito più piccolo: darà slancio a quelli più grandi.",
-    "Non serve una giornata perfetta, serve un blocco fatto bene."
+    "Non c'è vento favorevole per chi non sa dove andare. — Seneca",
+    "Parti dal compito più piccolo.",
+    "Chi va piano va sano e va lontano.",
+    "Basta un blocco fatto bene."
   ]
 };
 

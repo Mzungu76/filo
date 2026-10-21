@@ -949,10 +949,16 @@ export default function Home() {
             <span style={{ width: 44 }}/>
           </div>
           <div className="focus-body">
-            <Ring className="focus-ring" progress={ringValue}>
-              {mode === "break" && <span className="breath"/>}
-              <span className="ring-time">{formatTime(shown)}</span>
-            </Ring>
+            <div className="focus-ring">
+              <BigRing value={ringValue}>
+                {mode === "break" && <span className="breath"/>}
+                <div className="big-center">
+                  <span className="big-state"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
+                  <span className="big-time">{formatTime(shown)}</span>
+                  <span className="big-plan">{plan.work} min studio · {plan.rest} pausa</span>
+                </div>
+              </BigRing>
+            </div>
             {mode === "break" && <p className="breath-hint">Respira lentamente · alza lo sguardo dallo schermo</p>}
             {current && (
               <div className="focus-task"><small>{mode === "break" ? "Dopo la pausa" : "Adesso"}</small><strong>{current.title}</strong></div>

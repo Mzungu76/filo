@@ -434,3 +434,11 @@ p{text-wrap:pretty}
 .settings-block>strong,.reward-edit strong,.sound-test strong,.notification-row strong{font-size:14px}
 .preset strong{font-size:15px}
 .settings-modal.medal-sheet{padding-top:22px}
+
+/* Sessione aperta: stesso timer della home */
+.focus-ring{position:relative;display:block;width:auto;aspect-ratio:auto}
+.focus-ring .big-ring{width:min(82vw,360px,max(220px,calc(100dvh - 400px)))}
+.focus-ring .breath{inset:6%}
+.focus-ring .big-state{color:rgba(255,255,255,.8)}
+.focus-ring .big-ring svg{transform:none}
+.focus-ring .big-state{display:none}.focus-ring .big-ring{width:min(86vw,380px,max(220px,calc(100dvh - 330px)))}

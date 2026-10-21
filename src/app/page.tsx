@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, ChevronDown, Gift, House as HomeIcon, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, Gift, Sparkles, House as HomeIcon, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
@@ -11,7 +11,7 @@ import { advance as stepTimer } from "@/lib/timer";
 import { computeStats } from "@/lib/stats";
 import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
-import { Ring, subjectHue, tap } from "./ui";
+import { BigRing, Ring, subjectHue, tap } from "./ui";
 import GoalsView from "./GoalsView";
 import Medal, { LevelBadge } from "./Medal";
 import { TIER_NAMES, challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
@@ -81,6 +81,11 @@ export default function Home() {
   const [focusOpen, setFocusOpen] = useState(true);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [confirmFree, setConfirmFree] = useState(false);
+  const [skipFreeWarn, setSkipFreeWarn] = useState(false);
+  const addRef = useRef<HTMLInputElement>(null);
+  const dragY = useRef<number | null>(null);
   const [endAt, setEndAt] = useState<number | null>(null);
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [workSeconds, setWorkSeconds] = useState(0);
@@ -188,11 +193,11 @@ export default function Home() {
     if (theme === "auto") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = theme;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => void setStatusBar(theme === "dark" || (theme === "auto" && mq.matches));
+    const apply = () => void setStatusBar(view === "today" || theme === "dark" || (theme === "auto" && mq.matches), view === "today" ? "#102b3a" : undefined);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
-  }, [theme]);
+  }, [theme, view]);
   function changeTheme(next: "auto" | "light" | "dark") {
     setTheme(next);
     try { localStorage.setItem("filo-theme", next); } catch {}
@@ -427,6 +432,8 @@ export default function Home() {
   const total = (mode === "break" ? plan.rest : plan.work) * 60;
   const shown = mode === "idle" ? plan.work * 60 : remaining;
   const progress = mode === "idle" || mode === "paused" ? 0 : 1 - remaining / total;
+  // Anello "Time Timer": pieno quando è pronto, si consuma man mano che il tempo passa.
+  const ringValue = mode === "idle" ? 1 : Math.max(0, Math.min(1, remaining / total));
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
@@ -585,6 +592,28 @@ export default function Home() {
     } else if (alertsOn) void askNotificationPermission();
   }
 
+  /** Tocco su Play dalla home: senza compiti chiede conferma con un messaggio amichevole. */
+  function onPlay() {
+    let skip = skipFreeWarn;
+    try { skip = skip || localStorage.getItem("filo-skip-free-warning") === "1"; } catch {}
+    if (mode === "idle" && open.length === 0 && !skip) { setConfirmFree(true); return; }
+    startWork();
+  }
+  function openAdd() {
+    setSheetOpen(true);
+    setTimeout(() => addRef.current?.focus(), 380);
+  }
+  // Pannello dei compiti: si tira su/giù, oppure si tocca la maniglia.
+  const sheetDown = (e: React.PointerEvent) => { dragY.current = e.clientY; };
+  const sheetUp = (e: React.PointerEvent) => {
+    if (dragY.current === null) return;
+    const dy = e.clientY - dragY.current;
+    dragY.current = null;
+    if (dy < -28) setSheetOpen(true);
+    else if (dy > 28) setSheetOpen(false);
+    else if (Math.abs(dy) < 8 && !(e.target as HTMLElement).closest("button")) setSheetOpen((o) => !o);
+  };
+
   function startWork() {
     tap(15);
     setFocusOpen(true);
@@ -666,81 +695,7 @@ export default function Home() {
 
   if (!ready) return <main className="loading">Filo si sta preparando…</main>;
 
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <span className="brand"><span className="brand-mark" aria-hidden="true">
-          <svg viewBox="76 76 360 360" width="100%" height="100%">
-            <path d={THREAD_PATH} fill="none" stroke="#9be3c4" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d={CHECK_PATH} fill="none" stroke="#ffc857" strokeWidth="46" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </span><span>filo</span></span>
-        <button className="level-pill" onClick={() => setView("goals")} aria-label={`Livello ${level.level} ${level.name}, ${points.total} punti. Apri i traguardi`}>
-          <LevelBadge level={level.level} size={30}/>
-          <span>{points.total} <small>pt</small></span>
-          {(rewardReady || atRisk > 0) && <i className="dot"/>}
-        </button>
-      </header>
-
-      {view === "today" && rewardReady && (
-        <div className="reward-banner">
-          <Gift size={18}/>
-          <span>Premio da ritirare: {reward.text}</span>
-          <button className="install-go" onClick={() => void claimReward()}>Preso!</button>
-        </div>
-      )}
-
-      {view === "goals" ? (
-        <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
-          challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
-          onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
-      ) : view === "stats" ? (
-        <StatsView stats={stats} quote={quotesOn ? quote ?? pickQuote("idle") : null}/>
-      ) : (<>
-      {install.visible && !native && (
-        <div className="install-banner" role="note">
-          <Download size={18}/>
-          <span>
-            <strong>Installa Filo sul telefono</strong>
-            {install.ios
-              ? " Tocca Condividi e poi “Aggiungi alla schermata Home”: si apre a schermo intero e gli avvisi funzionano meglio."
-              : " Si apre a schermo intero, come un’app, e gli avvisi funzionano meglio."}
-          </span>
-          {!install.ios && <button className="install-go" onClick={install.install}>Installa</button>}
-          <button className="install-x" aria-label="Non ora" onClick={install.dismiss}><X size={14}/></button>
-        </div>
-      )}
-
-      <section className="timer-card">
-        <div className="timer-top">
-          <span className="pill"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
-          <span className="duration-setting">{plan.work} + {plan.rest} min</span>
-        </div>
-        <Ring className="ring" progress={progress}>
-          <span className="ring-time">{formatTime(shown)}</span>
-        </Ring>
-        <div className="hero-side">
-          <p className="current-task">
-            {current ? <><small>Adesso</small>{current.title}</> : <small>Aggiungi un compito per iniziare</small>}
-          </p>
-          {mode === "idle"
-            ? <button className="primary-btn big" onClick={startWork}><Play size={18} fill="currentColor"/> Inizia</button>
-            : <button className="primary-btn big" onClick={() => setFocusOpen(true)}>Apri sessione</button>}
-        </div>
-        {quotesOn && quote && mode === "idle" && <p className="quote on-dark">{quote}</p>}
-      </section>
-
-      {advance && mode === "idle" && (
-        <div className="advance-card" role="dialog" aria-label="Vuoi avvantaggiarti?">
-          <strong>Vuoi avvantaggiarti?</strong>
-          <p>Per oggi sei a posto. Il prossimo compito in scadenza è{advance.subject ? ` ${advance.subject}` : ""}: “{advance.title}” ({dueLabel(advance.dueDate, now).toLowerCase()}).</p>
-          <div className="advance-actions">
-            <button className="primary-btn dark" onClick={() => { setFocusId(advance.id); setAdvance(null); startWork(); }}>Sì, iniziamo</button>
-            <button className="secondary-light" onClick={() => setAdvance(null)}>No, per oggi basta</button>
-          </div>
-        </div>
-      )}
-
+  const tasksSection = (
       <section className="tasks-section">
         <div className="section-heading">
           <h2>Da fare <span className="count">{open.length}</span></h2>
@@ -788,7 +743,7 @@ export default function Home() {
         )}
 
         <form className="task-form" onSubmit={addTask}>
-          <input value={taskInput} onChange={(e) => setTaskInput(e.target.value)} onFocus={() => setAdding(true)} onBlur={() => setTimeout(() => setAdding(false), 200)}
+          <input ref={addRef} value={taskInput} onChange={(e) => setTaskInput(e.target.value)} onFocus={() => setAdding(true)} onBlur={() => setTimeout(() => setAdding(false), 200)}
             placeholder="Aggiungi un compito…" aria-label="Nuovo compito" maxLength={200} enterKeyHint="done"/>
           <button type="submit" aria-label="Aggiungi compito" disabled={!taskInput.trim()}><Plus size={22}/></button>
           {(adding || taskInput || taskDate) && (
@@ -811,7 +766,7 @@ export default function Home() {
               {list.map((task) => (
                 <div className={`task-row ${task.id === current?.id ? "focused" : ""} ${leavingId === task.id ? "leaving" : ""}`} key={task.id} style={{ "--sc": subjectHue(task.subject) } as React.CSSProperties}>
                   <button className={leavingId === task.id ? "check-btn done" : "check-btn"} aria-label="Segna completato" onClick={() => toggleTask(task)}>{leavingId === task.id && <Check size={16} strokeWidth={3}/>}</button>
-                  <button className="task-body" onClick={() => setFocusId(task.id)} aria-label={`Lavora su: ${task.title}`}>
+                  <button className="task-body" onClick={() => { setFocusId(task.id); setSheetOpen(false); }} aria-label={`Lavora su: ${task.title}`}>
                     {task.subject && <span className="subject-chip">{task.subject}</span>}
                     <span className="task-title">{task.title}</span>
                   </button>
@@ -837,8 +792,155 @@ export default function Home() {
           </div>
         )}
       </section>
+  );
+  const hasTasks = open.length > 0;
+  const nextTask = open.find((t) => t.id !== current?.id);
+  const planLabel = hasTasks ? `${plan.work} min di studio · poi pausa ${plan.rest}` : "Studio libero · senza compito";
 
-      <p className="bottom-stats"><span><b>{todayMinutes} min</b> oggi</span><span><b>{weekMinutes} min</b> questa settimana</span></p>
+  const topbar = (
+      <header className="topbar">
+        <span className="brand"><span className="brand-mark" aria-hidden="true">
+          <svg viewBox="76 76 360 360" width="100%" height="100%">
+            <path d={THREAD_PATH} fill="none" stroke="#9be3c4" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d={CHECK_PATH} fill="none" stroke="#ffc857" strokeWidth="46" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span><span>filo</span></span>
+        <button className="level-pill" onClick={() => setView("goals")} aria-label={`Livello ${level.level} ${level.name}, ${points.total} punti. Apri i traguardi`}>
+          <LevelBadge level={level.level} size={30}/>
+          <span>{points.total} <small>pt</small></span>
+          {(rewardReady || atRisk > 0) && <i className="dot"/>}
+        </button>
+      </header>
+  );
+  const isHome = view === "today";
+  const ringLabel = mode === "idle" ? "Pronto" : timerLabel;
+
+  return (
+    <main className={isHome ? "app-shell home-mode" : "app-shell"}>
+      {!isHome && topbar}
+
+      {view === "goals" ? (
+        <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
+          challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
+          onClaim={() => void claimReward()} onEditReward={() => setShowSettings(true)}/>
+      ) : view === "stats" ? (
+        <StatsView stats={stats} quote={quotesOn ? quote ?? pickQuote("idle") : null}/>
+      ) : (<>
+      <section className="home-hero">
+        {topbar}
+      {rewardReady && (
+        <div className="reward-banner">
+          <Gift size={18}/>
+          <span>Premio da ritirare: {reward.text}</span>
+          <button className="install-go" onClick={() => void claimReward()}>Preso!</button>
+        </div>
+      )}
+
+      {install.visible && !native && (
+        <div className="install-banner" role="note">
+          <Download size={18}/>
+          <span>
+            <strong>Installa Filo sul telefono</strong>
+            {install.ios
+              ? " Tocca Condividi e poi “Aggiungi alla schermata Home”: si apre a schermo intero e gli avvisi funzionano meglio."
+              : " Si apre a schermo intero, come un’app, e gli avvisi funzionano meglio."}
+          </span>
+          {!install.ios && <button className="install-go" onClick={install.install}>Installa</button>}
+          <button className="install-x" aria-label="Non ora" onClick={install.dismiss}><X size={14}/></button>
+        </div>
+      )}
+
+        <div className="ring-wrap">
+          <BigRing value={ringValue}>
+            <div className="big-center">
+              <span className="big-state"><span className={`status-dot ${mode}`}></span>{ringLabel}</span>
+              <span className="big-time">{formatTime(shown)}</span>
+              <span className="big-plan">{planLabel}</span>
+            </div>
+          </BigRing>
+          {mode === "idle"
+            ? <button className="play-btn" onClick={onPlay} aria-label="Inizia a studiare"><Play size={34} fill="currentColor"/></button>
+            : <button className="play-btn wide" onClick={() => setFocusOpen(true)}>Apri sessione</button>}
+        </div>
+
+        {mode === "idle" && (
+          <div className="preset-row" role="group" aria-label="Ritmo di studio">
+            {(["auto", "few", "medium", "many"] as Preset[]).map((p) => (
+              <button key={p} className={preset === p ? "preset on" : "preset"} onClick={() => void choosePreset(p)}>
+                {p === "auto" ? "Auto" : LEVELS[p].label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {hasTasks ? (
+          <div className="home-task">
+            <span><small>Adesso</small><b>{current?.title ?? "Scegli un compito"}</b></span>
+            <button onClick={() => setSheetOpen(true)}>Cambia ›</button>
+          </div>
+        ) : (
+          <div className="home-task empty">
+            <span className="home-task-actions">
+              <button onClick={() => { setShowImport(true); setSheetOpen(true); }}><ClipboardPaste size={15}/> Importa da DidUP</button>
+              <button onClick={openAdd}><Plus size={15}/> Scrivi</button>
+            </span>
+          </div>
+        )}
+        {quotesOn && quote && mode === "idle" && <p className="quote on-dark">{quote}</p>}
+      </section>
+
+      <div className={sheetOpen ? "sheet open" : "sheet"} role="region" aria-label="Compiti">
+        <div className="sheet-head" onPointerDown={sheetDown} onPointerUp={sheetUp} onPointerCancel={() => { dragY.current = null; }}>
+          <span className="grabber" aria-hidden="true"/>
+          {sheetOpen ? (
+            <div className="mini-hero">
+              <span className="mini-time">{formatTime(shown)}</span>
+              <span className="mini-info">{ringLabel}</span>
+              {mode === "idle"
+                ? <button className="mini-play" onClick={onPlay} aria-label="Inizia a studiare"><Play size={18} fill="currentColor"/></button>
+                : mode === "work"
+                  ? <button className="mini-play" onClick={pauseTimer} aria-label="Pausa"><Pause size={18} fill="currentColor"/></button>
+                  : <button className="mini-play" onClick={resumeWork} aria-label="Riprendi"><Play size={18} fill="currentColor"/></button>}
+            </div>
+          ) : (
+            <div className="peek">
+              <b>Da fare <span className="count">{open.length}</span></b>
+              <span>{nextTask ? `Poi: ${nextTask.title}` : hasTasks ? "Tira su per vedere i compiti" : "Tira su per aggiungere"}</span>
+            </div>
+          )}
+        </div>
+        <div className="sheet-body">
+{tasksSection}
+          <p className="bottom-stats"><span><b>{todayMinutes} min</b> oggi</span><span><b>{weekMinutes} min</b> questa settimana</span></p>
+        </div>
+      </div>
+
+      {confirmFree && (
+        <div className="modal-scrim" onClick={() => setConfirmFree(false)}>
+          <div className="advance-card" role="dialog" aria-label="Studi senza compiti" onClick={(e) => e.stopPropagation()}>
+            <strong>Stai studiando senza compiti!</strong>
+            <p>Non hai ancora niente in lista. Vuoi continuare lo stesso, oppure aggiungi prima un compito?</p>
+            <div className="advance-actions">
+              <button className="primary-btn dark" onClick={() => { setConfirmFree(false); startWork(); }}>Sì, continuo</button>
+              <button className="secondary-light" onClick={() => { setConfirmFree(false); openAdd(); }}>Aggiungo un compito</button>
+            </div>
+            <button className="link-btn" onClick={() => { try { localStorage.setItem("filo-skip-free-warning", "1"); } catch {} setSkipFreeWarn(true); setConfirmFree(false); startWork(); }}>Non avvisarmi più</button>
+          </div>
+        </div>
+      )}
+
+      {advance && mode === "idle" && (
+        <div className="modal-scrim" onClick={() => setAdvance(null)}>
+          <div className="advance-card" role="dialog" aria-label="Vuoi avvantaggiarti?" onClick={(e) => e.stopPropagation()}>
+            <strong>Vuoi avvantaggiarti?</strong>
+            <p>Per oggi sei a posto. Il prossimo compito in scadenza è{advance.subject ? ` ${advance.subject}` : ""}: “{advance.title}” ({dueLabel(advance.dueDate, now).toLowerCase()}).</p>
+            <div className="advance-actions">
+              <button className="primary-btn dark" onClick={() => { setFocusId(advance.id); setAdvance(null); startWork(); }}>Sì, iniziamo</button>
+              <button className="secondary-light" onClick={() => setAdvance(null)}>No, per oggi basta</button>
+            </div>
+          </div>
+        </div>
+      )}
       </>)}
 
       {mode !== "idle" && focusOpen && (
@@ -849,7 +951,7 @@ export default function Home() {
             <span style={{ width: 44 }}/>
           </div>
           <div className="focus-body">
-            <Ring className="focus-ring" progress={progress}>
+            <Ring className="focus-ring" progress={ringValue}>
               {mode === "break" && <span className="breath"/>}
               <span className="ring-time">{formatTime(shown)}</span>
             </Ring>
@@ -873,7 +975,7 @@ export default function Home() {
         </div>
       )}
 
-      {mode !== "idle" && !focusOpen && (
+      {mode !== "idle" && !focusOpen && !isHome && (
         <div className="mini-player" role="button" tabIndex={0} onClick={() => setFocusOpen(true)} onKeyDown={(e) => { if (e.key === "Enter") setFocusOpen(true); }} aria-label="Apri la sessione in corso">
           <span className="mp-time">{formatTime(shown)}</span>
           <span className="mp-info"><b>{current?.title ?? "Sessione in corso"}</b><span>{timerLabel}</span></span>

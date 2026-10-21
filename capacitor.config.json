@@ -4,5 +4,12 @@
   "webDir": "out",
   "android": {
     "allowMixedContent": false
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "LIGHT",
+      "backgroundColor": "#f2f6f5"
+    }
   }
 }

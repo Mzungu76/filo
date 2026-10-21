@@ -105,3 +105,13 @@ export async function consumeBlocked(): Promise<string | null> {
   if (!isNative()) return null;
   try { return (await Focus.consumeBlocked()).label ?? null; } catch { return null; }
 }
+
+/** Colora la barra di stato di Android in base al tema. */
+export async function setStatusBar(dark: boolean) {
+  if (!isNative()) return;
+  try {
+    const { StatusBar, Style } = await import("@capacitor/status-bar");
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+    await StatusBar.setBackgroundColor({ color: dark ? "#0b1721" : "#f2f6f5" });
+  } catch {}
+}

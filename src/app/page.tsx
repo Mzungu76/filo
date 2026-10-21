@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BarChart3, Gift, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { BarChart3, ChevronDown, Gift, House as HomeIcon, Trophy, Check, ClipboardPaste, Coffee, Download, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
 import { readImageText } from "@/lib/ocr";
@@ -11,12 +11,13 @@ import { advance as stepTimer } from "@/lib/timer";
 import { computeStats } from "@/lib/stats";
 import { pickQuote, type QuoteKind } from "@/lib/quotes";
 import StatsView from "./StatsView";
+import { Ring, subjectHue, tap } from "./ui";
 import GoalsView from "./GoalsView";
 import Medal, { LevelBadge } from "./Medal";
 import { TIER_NAMES, challengeProgress, computeMetrics, computePoints, levelOf, medalStates, planChallenges, rhythm as computeRhythm, type Challenge, type ChallengePlan, type MedalIcon, type Tier } from "@/lib/goals";
 import { weekStart as weekStartOf } from "@/lib/stats";
 import { CHECK_PATH, THREAD_PATH } from "@/lib/brandPath";
-import { SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
+import { setStatusBar, SUGGESTED_BLOCKED, consumeBlocked, guardStatus, listApps, openAccessibilitySettings, openAppInfo, setGuard, snoozeGuard, askNativeNotifications, cancelNative, pickAndReadImage, hasSilentAccess, isNative, openSilentSettings, scheduleNative, setSilent } from "@/lib/native";
 import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
@@ -76,6 +77,10 @@ export default function Home() {
   const [preset, setPreset] = useState<Preset>("auto");
   const [lockedPlan, setLockedPlan] = useState<Plan | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [theme, setTheme] = useState<"auto" | "light" | "dark">("auto");
+  const [focusOpen, setFocusOpen] = useState(true);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [endAt, setEndAt] = useState<number | null>(null);
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [workSeconds, setWorkSeconds] = useState(0);
@@ -174,6 +179,41 @@ export default function Home() {
   };
 
   useEffect(() => { keepAwake(mode === "work" || mode === "break"); }, [mode]);
+
+  // Tema: scelta salvata, applicata al documento; la barra di stato di Android la segue.
+  useEffect(() => {
+    try { const t = localStorage.getItem("filo-theme"); if (t === "light" || t === "dark") setTheme(t); } catch {}
+  }, []);
+  useEffect(() => {
+    if (theme === "auto") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => void setStatusBar(theme === "dark" || (theme === "auto" && mq.matches));
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [theme]);
+  function changeTheme(next: "auto" | "light" | "dark") {
+    setTheme(next);
+    try { localStorage.setItem("filo-theme", next); } catch {}
+  }
+
+  // Con la tastiera aperta la barra in basso si nasconde: lascia spazio a ciò che stai scrivendo.
+  useEffect(() => {
+    const isField = (t: EventTarget | null) => t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+    const on = (e: FocusEvent) => { if (isField(e.target)) document.documentElement.classList.add("typing"); };
+    const off = () => document.documentElement.classList.remove("typing");
+    document.addEventListener("focusin", on);
+    document.addEventListener("focusout", off);
+    return () => { document.removeEventListener("focusin", on); document.removeEventListener("focusout", off); };
+  }, []);
+
+  // Gli avvisi sono messaggi brevi: scompaiono da soli.
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(""), 9000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   // Promemoria all'orario di inizio (funziona finché Filo è aperto).
   useEffect(() => {
@@ -519,7 +559,13 @@ export default function Home() {
       ? { ...task, status: "todo", completedAt: undefined }
       : { ...task, status: "done", completedAt: Date.now() };
     await saveTask(next);
-    if (next.status === "done") setQuote(pickQuote("done"));
+    if (next.status === "done") {
+      tap(18);
+      setQuote(pickQuote("done"));
+      setLeavingId(task.id); // la riga scivola via prima di spostarsi tra i "Fatti oggi"
+      await new Promise((r) => setTimeout(r, 380));
+      setLeavingId(null);
+    }
     await refresh();
   }
 
@@ -540,6 +586,8 @@ export default function Home() {
   }
 
   function startWork() {
+    tap(15);
+    setFocusOpen(true);
     prepareAlerts();
     setAdvance(null);
     const start = Date.now();
@@ -562,7 +610,7 @@ export default function Home() {
     void setSilent(true);
     void scheduleNative("work", end, p.work, p.rest);
   }
-  function resumeWork() { unlockAudio(); startBlock(plan); }
+  function resumeWork() { tap(12); unlockAudio(); setFocusOpen(true); startBlock(plan); }
   function pauseTimer() {
     setMode("paused");
     setEndAt(null);
@@ -571,7 +619,9 @@ export default function Home() {
     void cancelNative();
   }
   function startBreak() {
+    tap(12);
     unlockAudio();
+    setFocusOpen(true);
     const t = Date.now();
     const end = t + plan.rest * 60000;
     lastTickRef.current = t;
@@ -585,6 +635,7 @@ export default function Home() {
 
   async function finishSession() {
     const end = Date.now();
+    setFocusOpen(false);
     if (sessionStart && workSeconds > 0) {
       await saveSession({
         id: uid(), startedAt: sessionStart, endedAt: end,
@@ -624,37 +675,21 @@ export default function Home() {
             <path d={CHECK_PATH} fill="none" stroke="#ffc857" strokeWidth="46" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </span><span>filo</span></span>
-        <span className="top-right">
-          <button className="icon-btn" aria-label={view === "goals" ? "Torna ai compiti" : "Traguardi"} onClick={() => setView(view === "goals" ? "today" : "goals")}>
-            {view === "goals" ? <ArrowLeft size={18}/> : <Trophy size={18}/>}
-          </button>
-          <button className="icon-btn" aria-label={view === "stats" ? "Torna ai compiti" : "Statistiche"} onClick={() => setView(view === "stats" ? "today" : "stats")}>
-            {view === "stats" ? <ArrowLeft size={18}/> : <BarChart3 size={18}/>}
-          </button>
-          <button className="icon-btn" aria-label="Impostazioni del programma" onClick={() => setShowSettings(true)}><Settings2 size={18}/></button>
-        </span>
+        <button className="level-pill" onClick={() => setView("goals")} aria-label={`Livello ${level.level} ${level.name}, ${points.total} punti. Apri i traguardi`}>
+          <LevelBadge level={level.level} size={30}/>
+          <span>{points.total} <small>pt</small></span>
+          {(rewardReady || atRisk > 0) && <i className="dot"/>}
+        </button>
       </header>
 
-      {view !== "goals" && (
-        <>
-          <button className="strip" onClick={() => setView("goals")} aria-label={`Livello ${level.level} ${level.name}, ${points.total} punti. Apri i traguardi`}>
-            <LevelBadge level={level.level} size={44}/>
-            <span className="strip-main">
-              <strong>{level.name}</strong>
-              <span className="strip-bar"><i style={{ width: `${level.pct}%` }}/></span>
-              <small>{points.total} pt{level.nextName ? ` · ${level.toNext} al livello ${level.level + 1}` : ""}{atRisk > 0 ? ` · ${atRisk} da mantenere` : ""}</small>
-            </span>
-            <span className="strip-today bump" key={points.today}>+{points.today}<small>oggi</small></span>
-          </button>
-          {reward.text && (
-            <div className={rewardReady ? "reward-line ready" : "reward-line"}>
-              <Gift size={15}/>
-              <span>{rewardReady ? `Premio da ritirare: ${reward.text}` : `Premio: ${reward.text} · ${Math.min(doneCount, reward.need)}/${reward.need} sfide`}</span>
-              {rewardReady && <button className="install-go" onClick={() => void claimReward()}>Preso!</button>}
-            </div>
-          )}
-        </>
+      {view === "today" && rewardReady && (
+        <div className="reward-banner">
+          <Gift size={18}/>
+          <span>Premio da ritirare: {reward.text}</span>
+          <button className="install-go" onClick={() => void claimReward()}>Preso!</button>
+        </div>
       )}
+
       {view === "goals" ? (
         <GoalsView level={level} points={points.total} rhythm={rhythm} medals={medals} curStreak={metrics.curStreak} daysThisWeek={metrics.daysThisWeek} records={records}
           challenges={challenges} reward={reward} doneCount={doneCount} rewardReady={rewardReady}
@@ -679,34 +714,20 @@ export default function Home() {
       <section className="timer-card">
         <div className="timer-top">
           <span className="pill"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
-          <span className="duration-setting">{startTime} · {plan.work}+{plan.rest} min</span>
+          <span className="duration-setting">{plan.work} + {plan.rest} min</span>
         </div>
-        <p className="current-task">
-          {current ? <><small>Adesso</small>{current.title}</> : <small>Aggiungi un compito per iniziare</small>}
-        </p>
-        <div className="timer-ring" style={{ "--progress": `${Math.min(100, Math.max(0, progress * 100))}%` } as React.CSSProperties}>
-          <div className="timer-inner">
-            <span className="timer-time">{formatTime(shown)}</span>
-          </div>
+        <Ring className="ring" progress={progress}>
+          <span className="ring-time">{formatTime(shown)}</span>
+        </Ring>
+        <div className="hero-side">
+          <p className="current-task">
+            {current ? <><small>Adesso</small>{current.title}</> : <small>Aggiungi un compito per iniziare</small>}
+          </p>
+          {mode === "idle"
+            ? <button className="primary-btn big" onClick={startWork}><Play size={18} fill="currentColor"/> Inizia</button>
+            : <button className="primary-btn big" onClick={() => setFocusOpen(true)}>Apri sessione</button>}
         </div>
-        <div className="timer-controls">
-          {mode === "idle" ? (
-            <button className="primary-btn" onClick={startWork}><Play size={17} fill="currentColor"/> Inizia</button>
-          ) : mode === "work" ? (
-            <>
-              <button className="primary-btn" onClick={pauseTimer}><Pause size={17} fill="currentColor"/> Pausa</button>
-              <button className="secondary-btn" onClick={startBreak}><Coffee size={17}/> Fai una pausa</button>
-              <button className="quiet-btn" onClick={finishSession}><Square size={15}/> Chiudi sessione</button>
-            </>
-          ) : (
-            <>
-              <button className="primary-btn" onClick={resumeWork}><Play size={17} fill="currentColor"/> Riprendi</button>
-              <button className="secondary-btn" onClick={finishSession}><Check size={17}/> Chiudi sessione</button>
-            </>
-          )}
-        </div>
-        {quotesOn && quote && <p className="quote on-dark">{quote}</p>}
-        {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Chiudi avviso" onClick={() => setNotice("")}><X size={14}/></button></div>}
+        {quotesOn && quote && mode === "idle" && <p className="quote on-dark">{quote}</p>}
       </section>
 
       {advance && mode === "idle" && (
@@ -722,7 +743,7 @@ export default function Home() {
 
       <section className="tasks-section">
         <div className="section-heading">
-          <h2>Da fare</h2>
+          <h2>Da fare <span className="count">{open.length}</span></h2>
           <button className="import-btn" onClick={() => setShowImport((v) => !v)}><ClipboardPaste size={15}/> Da DidUP</button>
         </div>
 
@@ -767,15 +788,18 @@ export default function Home() {
         )}
 
         <form className="task-form" onSubmit={addTask}>
-          <input value={taskInput} onChange={(e) => setTaskInput(e.target.value)} placeholder="Aggiungi un compito…" aria-label="Nuovo compito" maxLength={200}/>
-          <button type="submit" aria-label="Aggiungi compito" disabled={!taskInput.trim()}><Plus size={19}/></button>
-          <div className="date-row">
-            <span>Per quando?</span>
-            <button type="button" className={taskDate === dayKey(0) ? "chip on" : "chip"} onClick={() => setTaskDate(dayKey(0))}>Oggi</button>
-            <button type="button" className={taskDate === dayKey(1) ? "chip on" : "chip"} onClick={() => setTaskDate(dayKey(1))}>Domani</button>
-            <input type="date" value={taskDate} min={dayKey(0)} onChange={(e) => setTaskDate(e.target.value)} aria-label="Data di consegna"/>
-            {taskDate && <button type="button" className="chip" onClick={() => setTaskDate("")}>Nessuna data</button>}
-          </div>
+          <input value={taskInput} onChange={(e) => setTaskInput(e.target.value)} onFocus={() => setAdding(true)} onBlur={() => setTimeout(() => setAdding(false), 200)}
+            placeholder="Aggiungi un compito…" aria-label="Nuovo compito" maxLength={200} enterKeyHint="done"/>
+          <button type="submit" aria-label="Aggiungi compito" disabled={!taskInput.trim()}><Plus size={22}/></button>
+          {(adding || taskInput || taskDate) && (
+            <div className="date-row" onMouseDown={(e) => { if ((e.target as HTMLElement).tagName === "BUTTON") e.preventDefault(); }}>
+              <span>Per quando?</span>
+              <button type="button" className={taskDate === dayKey(0) ? "chip on" : "chip"} onClick={() => setTaskDate(dayKey(0))}>Oggi</button>
+              <button type="button" className={taskDate === dayKey(1) ? "chip on" : "chip"} onClick={() => setTaskDate(dayKey(1))}>Domani</button>
+              <input type="date" value={taskDate} min={dayKey(0)} onChange={(e) => setTaskDate(e.target.value)} aria-label="Data di consegna"/>
+              {taskDate && <button type="button" className="chip" onClick={() => setTaskDate("")}>Nessuna data</button>}
+            </div>
+          )}
         </form>
 
         {open.length === 0 ? (
@@ -785,8 +809,8 @@ export default function Home() {
             <p className="group-title">{dueLabel(key === -1 ? undefined : key, now)}</p>
             <div className="task-list">
               {list.map((task) => (
-                <div className={`task-row ${task.id === current?.id ? "focused" : ""}`} key={task.id}>
-                  <button className="check-btn" aria-label="Segna completato" onClick={() => toggleTask(task)}/>
+                <div className={`task-row ${task.id === current?.id ? "focused" : ""} ${leavingId === task.id ? "leaving" : ""}`} key={task.id} style={{ "--sc": subjectHue(task.subject) } as React.CSSProperties}>
+                  <button className={leavingId === task.id ? "check-btn done" : "check-btn"} aria-label="Segna completato" onClick={() => toggleTask(task)}>{leavingId === task.id && <Check size={16} strokeWidth={3}/>}</button>
                   <button className="task-body" onClick={() => setFocusId(task.id)} aria-label={`Lavora su: ${task.title}`}>
                     {task.subject && <span className="subject-chip">{task.subject}</span>}
                     <span className="task-title">{task.title}</span>
@@ -803,7 +827,7 @@ export default function Home() {
             <p className="group-title">Fatti oggi</p>
             <div className="task-list">
               {doneToday.map((task) => (
-                <div className="task-row completed" key={task.id}>
+                <div className="task-row completed" key={task.id} style={{ "--sc": subjectHue(task.subject) } as React.CSSProperties}>
                   <button className="check-btn" aria-label="Segna da fare" onClick={() => toggleTask(task)}><Check size={16}/></button>
                   <span className="task-body"><span className="task-title">{task.title}</span></span>
                   <button className="delete-btn" aria-label="Elimina compito" onClick={() => deleteTask(task.id)}><Trash2 size={16}/></button>
@@ -814,12 +838,68 @@ export default function Home() {
         )}
       </section>
 
-      <section className="bottom-stats">
-        <div><div><strong>{todayMinutes} min</strong><span>studio oggi</span></div></div>
-        <div><div><strong>{weekMinutes} min</strong><span>questa settimana</span></div></div>
-      </section>
-      <p className="privacy-note">I tuoi dati restano su questo dispositivo. Nessun account.</p>
+      <p className="bottom-stats"><span><b>{todayMinutes} min</b> oggi</span><span><b>{weekMinutes} min</b> questa settimana</span></p>
       </>)}
+
+      {mode !== "idle" && focusOpen && (
+        <div className={`focus-screen phase-${mode}`} role="dialog" aria-label="Sessione di studio">
+          <div className="focus-top">
+            <button className="icon-btn" onClick={() => setFocusOpen(false)} aria-label="Riduci e torna ai compiti"><ChevronDown size={22}/></button>
+            <span className="focus-phase"><span className={`status-dot ${mode}`}></span>{timerLabel}</span>
+            <span style={{ width: 44 }}/>
+          </div>
+          <div className="focus-body">
+            <Ring className="focus-ring" progress={progress}>
+              {mode === "break" && <span className="breath"/>}
+              <span className="ring-time">{formatTime(shown)}</span>
+            </Ring>
+            {mode === "break" && <p className="breath-hint">Respira lentamente · alza lo sguardo dallo schermo</p>}
+            {current && (
+              <div className="focus-task"><small>{mode === "break" ? "Dopo la pausa" : "Adesso"}</small><strong>{current.title}</strong></div>
+            )}
+          </div>
+          <div className="focus-bottom">
+            {quotesOn && quote && <p className="focus-quote">{quote}</p>}
+            <div className="focus-actions">
+              {mode === "work"
+                ? <button className="side-btn" onClick={startBreak}><span className="ic"><Coffee size={22}/></span>Pausa</button>
+                : <span className="side-btn" aria-hidden="true"/>}
+              {mode === "work"
+                ? <button className="round-btn" onClick={pauseTimer} aria-label="Metti in pausa il timer"><Pause size={32} fill="currentColor"/></button>
+                : <button className="round-btn" onClick={resumeWork} aria-label={mode === "break" ? "Riparti con lo studio" : "Riprendi"}><Play size={32} fill="currentColor"/></button>}
+              <button className="side-btn" onClick={finishSession}><span className="ic"><Square size={20}/></span>Chiudi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode !== "idle" && !focusOpen && (
+        <div className="mini-player" role="button" tabIndex={0} onClick={() => setFocusOpen(true)} onKeyDown={(e) => { if (e.key === "Enter") setFocusOpen(true); }} aria-label="Apri la sessione in corso">
+          <span className="mp-time">{formatTime(shown)}</span>
+          <span className="mp-info"><b>{current?.title ?? "Sessione in corso"}</b><span>{timerLabel}</span></span>
+          <button className="mp-btn" aria-label={mode === "work" ? "Pausa" : "Riprendi"} onClick={(e) => { e.stopPropagation(); if (mode === "work") pauseTimer(); else resumeWork(); }}>
+            {mode === "work" ? <Pause size={20} fill="currentColor"/> : <Play size={20} fill="currentColor"/>}
+          </button>
+        </div>
+      )}
+
+      <nav className="bottom-nav" aria-label="Navigazione principale">
+        <div className="bottom-nav-inner">
+          <button className={view === "today" ? "nav-item active" : "nav-item"} onClick={() => setView("today")} aria-current={view === "today" ? "page" : undefined}><HomeIcon size={22}/>Oggi</button>
+          <button className={view === "goals" ? "nav-item active" : "nav-item"} onClick={() => setView("goals")} aria-current={view === "goals" ? "page" : undefined}>
+            <Trophy size={22}/>Traguardi{(rewardReady || atRisk > 0) && <i className="nav-dot"/>}
+          </button>
+          <button className={view === "stats" ? "nav-item active" : "nav-item"} onClick={() => setView("stats")} aria-current={view === "stats" ? "page" : undefined}><BarChart3 size={22}/>Statistiche</button>
+          <button className={showSettings ? "nav-item active" : "nav-item"} onClick={() => setShowSettings(true)}><Settings2 size={22}/>Impostazioni</button>
+        </div>
+      </nav>
+
+      {notice && (
+        <div className="toast" role="status">
+          <span>{notice}</span>
+          <button aria-label="Chiudi avviso" onClick={() => setNotice("")}><X size={16}/></button>
+        </div>
+      )}
 
       {celebrations[0] && (
         <div className="modal-backdrop" role="presentation" style={{ zIndex: 40 }}>
@@ -877,6 +957,16 @@ export default function Home() {
             <div className="modal-head">
               <div><p className="eyebrow">PROGRAMMA</p><h2 id="settings-title">Quanto lavoro hai oggi?</h2></div>
               <button className="icon-btn" onClick={() => setShowSettings(false)} aria-label="Chiudi"><X size={18}/></button>
+            </div>
+            <div className="settings-block">
+              <strong>Aspetto</strong>
+              <div className="segmented" role="radiogroup" aria-label="Tema dell'app">
+                {(["auto", "light", "dark"] as const).map((t) => (
+                  <button key={t} role="radio" aria-checked={theme === t} className={theme === t ? "on" : ""} onClick={() => changeTheme(t)}>
+                    {t === "auto" ? "Automatico" : t === "light" ? "Chiaro" : "Scuro"}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="preset-list" role="radiogroup" aria-label="Quantità di compiti">
               <button role="radio" aria-checked={preset === "auto"} className={preset === "auto" ? "preset on" : "preset"} onClick={() => choosePreset("auto")}>
@@ -961,6 +1051,7 @@ export default function Home() {
               {!notificationsSupported() && <p>Questo browser non supporta le notifiche: resteranno suono e vibrazione.</p>}
             </details>}
             <p className="field-help">Il programma automatico considera i compiti per oggi e domani, quante materie sono e quanto lavoro richiede ciascuna. Il timer in corso non cambia durata a metà sessione.</p>
+            <p className="privacy-note">I tuoi dati restano su questo dispositivo. Nessun account.</p>
           </section>
         </div>
       )}

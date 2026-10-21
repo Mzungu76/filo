@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ClipboardPaste, Coffee, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
-import { getSessions, getTasks, removeTask, saveSession, saveTask, type StudySession, type Task } from "@/lib/db";
+import { Check, ClipboardPaste, Coffee, ImageUp, Settings2, ListTodo, Pause, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { getSessions, getSetting, getTasks, removeTask, saveSession, saveTask, setSetting, type StudySession, type Task } from "@/lib/db";
 import { parseDidup } from "@/lib/didup";
+import { readImageText } from "@/lib/ocr";
+import { LEVELS, planFor, type Plan, type Preset } from "@/lib/workload";
 
 type Mode = "idle" | "work" | "break" | "paused";
 
-// Programma suggerito: blocchi brevi con pausa, un compito alla volta.
-const WORK_MINUTES = 20;
-const BREAK_MINUTES = 10;
+// Programma suggerito: blocchi brevi con pausa, un compito alla volta. Le durate dipendono dal preset.
 const START_TIME = "16:30";
 const DAY = 24 * 3600 * 1000;
 
@@ -52,7 +52,10 @@ export default function Home() {
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [taskInput, setTaskInput] = useState("");
   const [mode, setMode] = useState<Mode>("idle");
-  const [remaining, setRemaining] = useState(WORK_MINUTES * 60);
+  const [remaining, setRemaining] = useState(0);
+  const [preset, setPreset] = useState<Preset>("auto");
+  const [lockedPlan, setLockedPlan] = useState<Plan | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [endAt, setEndAt] = useState<number | null>(null);
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [workSeconds, setWorkSeconds] = useState(0);
@@ -61,10 +64,15 @@ export default function Home() {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [skipped, setSkipped] = useState<number[]>([]);
+  const [reading, setReading] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const livePlan = useMemo(() => planFor(preset, tasks), [preset, tasks]);
+  const plan = lockedPlan ?? livePlan;
+
   const refresh = useCallback(async () => {
-    const [nextTasks, nextSessions] = await Promise.all([getTasks(), getSessions()]);
+    const [nextTasks, nextSessions, savedPreset] = await Promise.all([getTasks(), getSessions(), getSetting<Preset>("preset", "auto")]);
+    setPreset(savedPreset);
     setTasks(nextTasks);
     setSessions(nextSessions);
     setReady(true);
@@ -87,9 +95,9 @@ export default function Home() {
         timerRef.current = null;
         if (mode === "work") {
           setMode("break");
-          setRemaining(BREAK_MINUTES * 60);
-          setEndAt(Date.now() + BREAK_MINUTES * 60 * 1000);
-          setNotice(`Blocco completato. Pausa di ${BREAK_MINUTES} minuti: alzati e muoviti un po’.`);
+          setRemaining(plan.rest * 60);
+          setEndAt(Date.now() + plan.rest * 60 * 1000);
+          setNotice(`Blocco completato. Pausa di ${plan.rest} minuti: alzati e muoviti un po’.`);
         } else {
           setMode("paused");
           setEndAt(null);
@@ -98,7 +106,7 @@ export default function Home() {
       }
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [mode, endAt]);
+  }, [mode, endAt, plan]);
 
   const now = Date.now();
   const open = useMemo(() => tasks.filter((t) => t.status === "todo").sort(byDue), [tasks]);
@@ -122,7 +130,8 @@ export default function Home() {
   const toAdd = preview.filter((_, i) => !skipped.includes(i));
 
   const timerLabel = mode === "break" ? "PAUSA" : mode === "paused" ? "IN PAUSA" : mode === "work" ? "FOCUS" : "PRONTO";
-  const total = (mode === "break" ? BREAK_MINUTES : WORK_MINUTES) * 60;
+  const total = (mode === "break" ? plan.rest : plan.work) * 60;
+  const shown = mode === "idle" ? plan.work * 60 : remaining;
   const progress = mode === "idle" || mode === "paused" ? 0 : 1 - remaining / total;
 
   async function addTask(e: React.FormEvent) {
@@ -155,6 +164,28 @@ export default function Home() {
     }
   }
 
+  async function importImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setReading(0);
+    try {
+      const text = await readImageText(file, setReading);
+      setImportText(text);
+      setSkipped([]);
+      if (parseDidup(text).length === 0) setNotice("Non ho trovato compiti nell'immagine. Prova con uno screenshot più nitido.");
+    } catch {
+      setNotice("Non sono riuscito a leggere l'immagine. Riprova, oppure incolla il testo.");
+    } finally {
+      setReading(null);
+    }
+  }
+
+  async function choosePreset(next: Preset) {
+    setPreset(next);
+    await setSetting("preset", next);
+  }
+
   async function toggleTask(task: Task) {
     const next: Task = task.status === "done"
       ? { ...task, status: "todo", completedAt: undefined }
@@ -170,16 +201,17 @@ export default function Home() {
 
   function startWork() {
     const start = Date.now();
-    if (mode === "idle") { setSessionStart(start); setWorkSeconds(0); }
-    resumeWork();
+    if (mode === "idle") { setSessionStart(start); setWorkSeconds(0); setLockedPlan(livePlan); }
+    startBlock(lockedPlan ?? livePlan);
     setNotice("");
   }
-  function resumeWork() {
+  function startBlock(p: Plan) {
     setMode("work");
-    setRemaining(WORK_MINUTES * 60);
-    setEndAt(Date.now() + WORK_MINUTES * 60 * 1000);
+    setRemaining(p.work * 60);
+    setEndAt(Date.now() + p.work * 60 * 1000);
     setNotice("");
   }
+  function resumeWork() { startBlock(plan); }
   function pauseTimer() {
     setMode("paused");
     setEndAt(null);
@@ -187,8 +219,8 @@ export default function Home() {
   }
   function startBreak() {
     setMode("break");
-    setRemaining(BREAK_MINUTES * 60);
-    setEndAt(Date.now() + BREAK_MINUTES * 60 * 1000);
+    setRemaining(plan.rest * 60);
+    setEndAt(Date.now() + plan.rest * 60 * 1000);
     setNotice("");
   }
 
@@ -204,7 +236,7 @@ export default function Home() {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
     setMode("idle"); setEndAt(null); setSessionStart(null); setWorkSeconds(0);
-    setRemaining(WORK_MINUTES * 60);
+    setLockedPlan(null);
     setNotice("Sessione chiusa. Bel lavoro.");
     await refresh();
   }
@@ -215,7 +247,10 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <span className="brand"><span className="brand-mark">f</span><span>filo</span></span>
-        <span className="suggested">Programma: {START_TIME} · {WORK_MINUTES} min + {BREAK_MINUTES} min</span>
+        <span className="top-right">
+          <span className="suggested">{START_TIME} · {plan.work}+{plan.rest} min</span>
+          <button className="icon-btn" aria-label="Impostazioni del programma" onClick={() => setShowSettings(true)}><Settings2 size={18}/></button>
+        </span>
       </header>
 
       <section className="timer-card">
@@ -227,7 +262,7 @@ export default function Home() {
         </p>
         <div className="timer-ring" style={{ "--progress": `${Math.min(100, Math.max(0, progress * 100))}%` } as React.CSSProperties}>
           <div className="timer-inner">
-            <span className="timer-time">{formatTime(remaining)}</span>
+            <span className="timer-time">{formatTime(shown)}</span>
           </div>
         </div>
         <div className="timer-controls">
@@ -257,11 +292,15 @@ export default function Home() {
 
         {showImport && (
           <div className="import-box">
-            <p className="field-help">In DidUP apri Diario → Compiti, tocca il pulsante di condivisione (o copia il testo) e incolla qui.</p>
+            <p className="field-help">In DidUP apri Diario → Compiti e fai uno screenshot: caricalo qui. In alternativa, copia il testo e incollalo.</p>
+            <label className={`secondary-light upload ${reading !== null ? "busy" : ""}`}>
+              <ImageUp size={15}/> {reading === null ? "Carica screenshot" : `Leggo l’immagine… ${Math.round(reading * 100)}%`}
+              <input type="file" accept="image/*" onChange={importImage} disabled={reading !== null} hidden/>
+            </label>
             <textarea
               value={importText}
               onChange={(e) => { setImportText(e.target.value); setSkipped([]); }}
-              placeholder="Incolla qui i compiti…"
+              placeholder="…oppure incolla qui il testo dei compiti"
               aria-label="Testo dei compiti da DidUP"
               rows={5}
             />
@@ -331,6 +370,30 @@ export default function Home() {
         <div><div><strong>{weekMinutes} min</strong><span>questa settimana</span></div></div>
       </section>
       <p className="privacy-note">I tuoi dati restano su questo dispositivo. Nessun account.</p>
+
+      {showSettings && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowSettings(false); }}>
+          <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div className="modal-head">
+              <div><p className="eyebrow">PROGRAMMA</p><h2 id="settings-title">Quanto lavoro hai oggi?</h2></div>
+              <button className="icon-btn" onClick={() => setShowSettings(false)} aria-label="Chiudi"><X size={18}/></button>
+            </div>
+            <div className="preset-list" role="radiogroup" aria-label="Quantità di compiti">
+              <button role="radio" aria-checked={preset === "auto"} className={preset === "auto" ? "preset on" : "preset"} onClick={() => choosePreset("auto")}>
+                <strong>Automatico</strong>
+                <span>Lo scelgo io in base ai compiti. Ora: <b>{LEVELS[livePlan.level].label.toLowerCase()}</b>.</span>
+              </button>
+              {(Object.keys(LEVELS) as (keyof typeof LEVELS)[]).map((level) => (
+                <button key={level} role="radio" aria-checked={preset === level} className={preset === level ? "preset on" : "preset"} onClick={() => choosePreset(level)}>
+                  <strong>{LEVELS[level].label} · {LEVELS[level].work} min + {LEVELS[level].rest} min</strong>
+                  <span>{LEVELS[level].hint}</span>
+                </button>
+              ))}
+            </div>
+            <p className="field-help">Il programma automatico considera i compiti per oggi e domani, quante materie sono e quanto lavoro richiede ciascuna. Il timer in corso non cambia durata a metà sessione.</p>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

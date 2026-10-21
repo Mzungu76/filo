@@ -7,8 +7,9 @@ const MONTHS: Record<string, number> = {
 const LANGUAGES = ["spagnolo", "tedesco", "inglese", "francese", "russo", "cinese", "portoghese"];
 
 const HEADER = /^da consegnare\s+(?:[\p{L}]+\s+)?(\d{1,2})\s+([\p{L}]+)/iu;
-const ASSIGNED_IN = /^assegnato in\b/i;
-const ASSIGNED_ON = /^assegnato il\b/i;
+// L'OCR può far precedere le righe da 1-3 caratteri spuri (icone lette come lettere).
+const ASSIGNED_IN = /^(?:\S{1,3}\s+)?assegnat[oa] in\b/i;
+const ASSIGNED_ON = /^(?:\S{1,3}\s+)?assegnat[oa] il\b/i;
 const NOISE = /^(home|menu|diario|attivit[àa]|compiti|mattia|\d{1,2}:\d{2}|[\p{L}]+ \d{4})$/iu;
 
 function startOfDay(ts: number) {
@@ -45,8 +46,8 @@ export function prettySubject(raw: string) {
   return sentenceCase(s);
 }
 
-const looksLikeName = (line: string) =>
-  line.length < 40 && line === line.toUpperCase() && !/\d/.test(line);
+const NAME = /^(?:\S{1,2}\s+)?\p{Lu}\.?\s*[\p{Lu}'’ -]+$/u;
+const looksLikeName = (line: string) => line.length < 45 && NAME.test(line);
 
 /**
  * Legge il testo della schermata "Compiti" di DidUP (copiato o condiviso):
@@ -66,14 +67,18 @@ export function parseDidup(text: string, now = Date.now()): ParsedTask[] {
 
   const tasks: ParsedTask[] = [];
   let due: number | undefined;
-  let state: "idle" | "subject" | "teacher" | "meta" | "body" = "subject";
+  // Con l'intestazione "DA CONSEGNARE" ignoro tutto ciò che la precede (barra di stato, titoli).
+  let state: "idle" | "subject" | "teacher" | "meta" | "body" = lines.some((l) => HEADER.test(l)) ? "idle" : "subject";
   let subject = "";
   let body: string[] = [];
+  let hasMeta = false;
 
+  // Un blocco è valido solo se DidUP lo ha marcato ("Assegnato in ..."): scarta il rumore dell'OCR.
   const flush = () => {
     const title = body.join(" ").trim();
-    if (title) tasks.push({ title, subject: subject ? prettySubject(subject) : undefined, dueDate: due });
+    if (title && hasMeta) tasks.push({ title, subject: subject ? prettySubject(subject) : undefined, dueDate: due });
     body = [];
+    hasMeta = false;
   };
 
   for (const line of lines) {
@@ -84,19 +89,20 @@ export function parseDidup(text: string, now = Date.now()): ParsedTask[] {
       state = "subject";
       continue;
     }
+    if (state === "idle") continue;
     if (state === "subject") {
       if (NOISE.test(line)) continue;
       subject = line;
       state = "teacher";
     } else if (state === "teacher") {
-      if (ASSIGNED_IN.test(line)) state = "body";
+      if (ASSIGNED_IN.test(line)) { hasMeta = true; state = "body"; }
       else if (looksLikeName(line)) state = "meta";
       else { body.push(line); state = "body"; }
     } else if (state === "meta") {
-      if (ASSIGNED_IN.test(line)) state = "body";
+      if (ASSIGNED_IN.test(line)) { hasMeta = true; state = "body"; }
       else { body.push(line); state = "body"; }
     } else if (state === "body") {
-      if (ASSIGNED_ON.test(line)) { flush(); state = "subject"; }
+      if (ASSIGNED_ON.test(line)) { hasMeta = true; flush(); state = "subject"; }
       else body.push(line);
     }
   }
